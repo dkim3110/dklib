@@ -356,9 +356,6 @@ typedef char *dyn_char;
   #define DYNAMIC_ARRAY_INIT_CAPACITY (8)
 #endif // DYNAMIC_ARRAY_INIT_CAPACITY
 
-MEM_ARENA_DEC void *arr__initialization_impl(mem_arena *arena, size_t elem_size, size_t count);
-MEM_ARENA_DEC void *arr__grow_impl(mem_arena *arena, void *arr, size_t elem_size);
-
 #define arr_init(arena, type, size) arr__initialization_impl((arena), sizeof(type), (size))
 
 #define arr_len(arr)  ((arr) ? ((arr_header *)(arr) - 1)->data.count : 0)
@@ -366,14 +363,69 @@ MEM_ARENA_DEC void *arr__grow_impl(mem_arena *arena, void *arr, size_t elem_size
 #define arr_last(arr) ((arr)[arr_len(arr) - 1])
 #define arr_pop(arr)  (void)(((arr) && (arr_len(arr) > 0)) ? --((arr_header *)(arr) - 1)->data.count : 0)
 
+#define arr_rev(arr)                                                                                                   \
+  ({                                                                                                                   \
+  bool __success = false;                                                                                              \
+  if (arr) {                                                                                                           \
+    size_t len = arr_len(arr);                                                                                         \
+    if (len > 1) {                                                                                                     \
+      __success = true;                                                                                                \
+      typeof(arr) left = (arr);                                                                                        \
+      typeof(arr) right = left + (len - 1);                                                                            \
+      for (; left < right; left++, right--) {                                                                          \
+        typeof(*(arr)) temp = (*left);                                                                                 \
+        (*left) = (*right);                                                                                            \
+        (*right) = temp;                                                                                               \
+      }                                                                                                                \
+    }                                                                                                                  \
+  }                                                                                                                    \
+  __success;                                                                                                           \
+  })
+
+#define arr_rem(arr, n)                                                                                                \
+  ({                                                                                                                   \
+  bool __success = false;                                                                                              \
+  if (arr) {                                                                                                           \
+    size_t __len = arr_len(arr);                                                                                       \
+    if ((n) < __len) {                                                                                                 \
+      (arr)[(n)] = (arr)[__len - 1];                                                                                   \
+      arr_pop(arr);                                                                                                    \
+      __success = true;                                                                                                \
+    }                                                                                                                  \
+  }                                                                                                                    \
+  __success;                                                                                                           \
+  })
+
+#define arr_rem_ord(arr, n)                                                                                            \
+  ({                                                                                                                   \
+  bool __success = false;                                                                                              \
+  if (arr) {                                                                                                           \
+    size_t __len = arr_len(arr);                                                                                       \
+    if ((n) < __len) {                                                                                                 \
+      memmove(&(arr)[(n)], &(arr)[(n) + 1], (__len - (n) - 1) * sizeof(*(arr)));                                       \
+      arr_pop(arr);                                                                                                    \
+      __success = true;                                                                                                \
+    }                                                                                                                  \
+  }                                                                                                                    \
+  __success;                                                                                                           \
+  })
+
 #define arr_push(arena, arr, element)                                                                                  \
-  /* ↓ if arr is null or count is greater than or equal to cap */                                                      \
-  ((!(arr)) || (arr_len(arr) >= arr_cap(arr)))                                                                         \
-    ? (((arr) = arr__grow_impl((arena), (arr), sizeof(*(arr))))               /* if arr__grow_impl() is successful */  \
-         ? ((arr)[((arr_header *)(arr) - 1)->data.count++] = (element), true) /* push to array and increment count */  \
-         : false)                                                             /* failure if not */                     \
-    : ((arr)[((arr_header *)(arr) - 1)->data.count++] = (element), true)
-/* ↑ else simply push to array and increment count */
+  ({                                                                                                                   \
+  bool __success = true;                                                                                               \
+  if (!(arr) || (arr_len(arr) >= arr_cap(arr))) {                                                                      \
+    void *__tmp = arr__grow_impl((arena), (arr), sizeof(*(arr)));                                                      \
+    if (__tmp) (arr) = __tmp;                                                                                          \
+    else __success = false;                                                                                            \
+  }                                                                                                                    \
+  if (__success) (arr)[((arr_header *)(arr) - 1)->data.count++] = (element);                                           \
+  __success;                                                                                                           \
+  })
+
+// TODO: #define arr_insert(arr, n)
+
+MEM_ARENA_DEC void *arr__initialization_impl(mem_arena *arena, size_t elem_size, size_t count);
+MEM_ARENA_DEC void *arr__grow_impl(mem_arena *arena, void *arr, size_t elem_size);
 
 #endif // MEM_ARENA_DYNAMIC_ARRAY
 
