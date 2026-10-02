@@ -2,7 +2,7 @@
 
 ## Usage
 
-Macros that enable function definitions (excluding the MAKE_STATIC macros) must only be defined once in one source file. See [this](https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt) for more info.
+Macros that enable function definitions (excluding the MAKE_STATIC macros) must only be defined once in one source file. See [here](https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt) for more info.
 
 Define `_DEFAULT_SOURCE` beforehand.
 
