@@ -2,10 +2,7 @@
 // Header-only library for virtual memory arenas.
 // See end of file for license information.
 
-/* add -D_DEFAULT_SOURCE as a compiler argument */
-
-/* customizeable macros */
-// - DYNAMIC_ARRAY_INIT_CAPACITY: initial capacity of dynamic arrays; default is 8
+/* #define _DEFAULT_SOURCE beforehand */
 
 /* flags */
 // - MEM_ARENA_IMPLEMENTATION: enable function definitions
@@ -14,6 +11,10 @@
 // - MEM_ARENA_DYNAMIC_ARRAY: enable dynamic array function declarations
 // - MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION: enable dynamic array function definitions
 // - MEM_ARENA_GIMME_DYNAMIC_ARRAY: enable dynamic array function declarations + definitions
+//
+// - MEM_ARENA_STRING_BUILDER: enable string function declarations
+// - MEM_ARENA_STRING_BUILDER_IMPLEMENTATION: enable string function definitions
+// - MEM_ARENA_GIMME_STRING: enable string function declarations + definitions
 //
 // - MEM_ARENA_GIMME_ALL: define all of the above
 // - MEM_ARENA_GIMME_ALL_DEC: include all declarations; no definitions
@@ -27,11 +28,12 @@
  * info.
  */
 
-#ifdef __clang__
-    #pragma clang diagnostic ignored "-Winitializer-overrides"
-#elif defined(__GNUC__)
-    #pragma GCC diagnostic ignored "-Woverride-init"
-#endif // Compilers
+/* disable override warnings */
+// #ifdef __clang__
+//     #pragma clang diagnostic ignored "-Winitializer-overrides"
+// #elif defined(__GNUC__)
+//     #pragma GCC diagnostic ignored "-Woverride-init"
+// #endif // Compilers
 
 #ifndef MEM_ARENA_H_
 #define MEM_ARENA_H_
@@ -45,10 +47,12 @@
   #define MEM_ARENA_IMPLEMENTATION
   #define MEM_ARENA_USE_DEFAULT_OOM_HANDLER
   #define MEM_ARENA_GIMME_DYNAMIC_ARRAY
+  #define MEM_ARENA_GIMME_STRING
 #endif // MEM_ARENA_GIMME_ALL
 
 #ifdef MEM_ARENA_GIMME_ALL_DEC
   #define MEM_ARENA_DYNAMIC_ARRAY
+  #define MEM_ARENA_STRING_BUILDER
 #endif // MEM_ARENA_GIMME_ALL_DEC
 
 #ifdef MEM_ARENA_MAKE_STATIC
@@ -68,6 +72,11 @@
 #ifdef MEM_ARENA_GIMME_DYNAMIC_ARRAY
   #define MEM_ARENA_DYNAMIC_ARRAY
   #define MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
+#endif // MEM_ARENA_GIMME_DYNAMIC_ARRAY
+
+#ifdef MEM_ARENA_GIMME_STRING
+  #define MEM_ARENA_STRING_BUILDER
+  #define MEM_ARENA_STRING_BUILDER_IMPLEMENTATION
 #endif // MEM_ARENA_GIMME_DYNAMIC_ARRAY
 
 #if defined(__linux__) || defined(__APPLE__) || defined(__unix__)
@@ -166,9 +175,10 @@ MEM_ARENA_DEC bool arena__sys_mem_release(void *, size_t);
 
 MEM_ARENA_DEF void arena_oom_handler(mem_arena *arena, size_t requested_size) {
   fprintf(stderr,
-          "[mem_arena: %s] FATAL: OUT OF MEMORY\n"
+          "[mem_arena%s%s] OUT OF MEMORY\n"
           " | Attempted to allocate: %zu bytes\n"
           " | Remaining capacity   : %zu bytes\n",
+          (arena->name) ? ": " : "",
           (arena->name) ? arena->name : "",
           requested_size,
           (arena->reserve - arena->pos));
@@ -337,6 +347,29 @@ MEM_ARENA_DEF bool arena__sys_mem_release(void *ptr, size_t size) {
 
 #endif // MEM_ARENA_IMPLEMENTATION
 
+#ifdef MEM_ARENA_STRING_BUILDER
+  #ifndef MEM_ARENA_DYNAMIC_ARRAY
+    #define MEM_ARENA_DYNAMIC_ARRAY
+  #endif // MEM_ARENA_DYNAMIC_ARRAY
+
+typedef char *strb;
+
+#define STR_BLDR__IS_ARR(x)                 (!__builtin_types_compatible_p(typeof(x), typeof(&(x)[0])))
+#define STR_BLDR__VALIDATE_STR_LIT(str_lit) (sizeof(str_lit) - 1 + 0 * sizeof(char[STR_BLDR__IS_ARR(str_lit) ? 1 : -1]))
+
+#define build_string(arena, strlit) sb__build_string_impl((arena), (strlit), STR_BLDR__VALIDATE_STR_LIT(strlit))
+
+MEM_ARENA_DEC size_t sb_strlen(strb sb);
+
+MEM_ARENA_DEC void sb_null_terminate(mem_arena *arena, strb *sb);
+MEM_ARENA_DEC void sb_null_pop(strb *sb);
+MEM_ARENA_DEC bool sb_insert(mem_arena *arena, strb *sb, char c, size_t n);
+MEM_ARENA_DEC bool sb_append(mem_arena *arena, strb *sb, char c);
+
+MEM_ARENA_DEC char *sb__build_string_impl(mem_arena *arena, const char *strlit, size_t len);
+
+#endif // MEM_ARENA_STRING_BUILDER
+
 #ifdef MEM_ARENA_DYNAMIC_ARRAY
 
 typedef union {
@@ -345,134 +378,209 @@ typedef union {
     size_t cap;
   } data;
   max_align_t align;
-} arr_header;
+} darr_header;
 
 typedef int *dyn_int;
 typedef float *dyn_flt;
 typedef double *dyn_dbl;
 typedef char *dyn_char;
 
-#ifndef DYNAMIC_ARRAY_INIT_CAPACITY
-  #define DYNAMIC_ARRAY_INIT_CAPACITY (8)
-#endif // DYNAMIC_ARRAY_INIT_CAPACITY
+#define DYNAMIC_ARRAY_INIT_CAPACITY (8)
 
-#define arr_init(arena, type, size) arr__initialization_impl((arena), sizeof(type), (size))
+#define darr_init(arena, type, size) darr__initialization_impl((arena), sizeof(type), (size))
 
-#define arr_len(arr)  ((arr) ? ((arr_header *)(arr) - 1)->data.count : 0)
-#define arr_cap(arr)  ((arr) ? ((arr_header *)(arr) - 1)->data.cap : 0)
-#define arr_last(arr) ((arr)[arr_len(arr) - 1])
-#define arr_pop(arr)  (void)(((arr) && (arr_len(arr) > 0)) ? --((arr_header *)(arr) - 1)->data.count : 0)
+#define darr_len(arr)  ((arr) ? ((darr_header *)(arr) - 1)->data.count : 0)
+#define darr_cap(arr)  ((arr) ? ((darr_header *)(arr) - 1)->data.cap : 0)
+#define darr_last(arr) ((arr)[darr_len(arr) - 1])
+#define darr_pop(arr)  (void)(((arr) && (darr_len(arr) > 0)) ? --((darr_header *)(arr) - 1)->data.count : 0)
 
-#define arr_rev(arr)                                                                                                   \
+#define darr_rev(arr)                                                                                                  \
   ({                                                                                                                   \
   bool __success = false;                                                                                              \
   if (arr) {                                                                                                           \
-    size_t len = arr_len(arr);                                                                                         \
-    if (len > 1) {                                                                                                     \
+    size_t __len = darr_len(arr);                                                                                      \
+    if (__len > 1) {                                                                                                   \
       __success = true;                                                                                                \
-      typeof(arr) left = (arr);                                                                                        \
-      typeof(arr) right = left + (len - 1);                                                                            \
-      for (; left < right; left++, right--) {                                                                          \
-        typeof(*(arr)) temp = (*left);                                                                                 \
-        (*left) = (*right);                                                                                            \
-        (*right) = temp;                                                                                               \
+      typeof(arr) __left = (arr);                                                                                      \
+      typeof(arr) __right = __left + (__len - 1);                                                                      \
+      for (; __left < __right; __left++, __right--) {                                                                  \
+        typeof(*(arr)) __tmp = (*__left);                                                                              \
+        (*__left) = (*__right);                                                                                        \
+        (*__right) = __tmp;                                                                                            \
       }                                                                                                                \
     }                                                                                                                  \
   }                                                                                                                    \
   __success;                                                                                                           \
   })
 
-#define arr_rem(arr, n)                                                                                                \
+#define darr_rem(arr, n)                                                                                               \
   ({                                                                                                                   \
   bool __success = false;                                                                                              \
   if (arr) {                                                                                                           \
-    size_t __len = arr_len(arr);                                                                                       \
+    size_t __len = darr_len(arr);                                                                                      \
     if ((n) < __len) {                                                                                                 \
       (arr)[(n)] = (arr)[__len - 1];                                                                                   \
-      arr_pop(arr);                                                                                                    \
+      darr_pop(arr);                                                                                                   \
       __success = true;                                                                                                \
     }                                                                                                                  \
   }                                                                                                                    \
   __success;                                                                                                           \
   })
 
-#define arr_rem_ord(arr, n)                                                                                            \
+#define darr_rem_ord(arr, n)                                                                                           \
   ({                                                                                                                   \
   bool __success = false;                                                                                              \
   if (arr) {                                                                                                           \
-    size_t __len = arr_len(arr);                                                                                       \
+    size_t __len = darr_len(arr);                                                                                      \
     if ((n) < __len) {                                                                                                 \
       memmove(&(arr)[(n)], &(arr)[(n) + 1], (__len - (n) - 1) * sizeof(*(arr)));                                       \
-      arr_pop(arr);                                                                                                    \
+      darr_pop(arr);                                                                                                   \
       __success = true;                                                                                                \
     }                                                                                                                  \
   }                                                                                                                    \
   __success;                                                                                                           \
   })
 
-#define arr_push(arena, arr, element)                                                                                  \
+#define darr_push(arena, arr, element)                                                                                 \
   ({                                                                                                                   \
   bool __success = true;                                                                                               \
-  if (!(arr) || (arr_len(arr) >= arr_cap(arr))) {                                                                      \
-    void *__tmp = arr__grow_impl((arena), (arr), sizeof(*(arr)));                                                      \
+  if (!(arr) || (darr_len(arr) >= darr_cap(arr))) {                                                                    \
+    void *__tmp = darr__grow_impl((arena), (arr), sizeof(*(arr)));                                                     \
     if (__tmp) (arr) = __tmp;                                                                                          \
     else __success = false;                                                                                            \
   }                                                                                                                    \
-  if (__success) (arr)[((arr_header *)(arr) - 1)->data.count++] = (element);                                           \
+  if (__success) (arr)[((darr_header *)(arr) - 1)->data.count++] = (element);                                          \
   __success;                                                                                                           \
   })
 
-// TODO: #define arr_insert(arr, n)
+// TODO: #define darr_insert(arr, n)
 
-MEM_ARENA_DEC void *arr__initialization_impl(mem_arena *arena, size_t elem_size, size_t count);
-MEM_ARENA_DEC void *arr__grow_impl(mem_arena *arena, void *arr, size_t elem_size);
+MEM_ARENA_DEC void *darr__initialization_impl(mem_arena *arena, size_t elem_size, size_t count);
+MEM_ARENA_DEC void *darr__grow_impl(mem_arena *arena, void *arr, size_t elem_size);
 
 #endif // MEM_ARENA_DYNAMIC_ARRAY
 
+#ifdef MEM_ARENA_STRING_BUILDER_IMPLEMENTATION
+  #ifndef MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
+    #define MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
+  #endif // MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
+
+MEM_ARENA_DEF size_t sb_strlen(strb sb) {
+  if (!sb) return 0;
+  size_t len = darr_len(sb);
+  if (!len) return 0;
+  if (darr_last(sb) == '\0') len--;
+
+  return len;
+} /* sb_strlen() */
+
+MEM_ARENA_DEF void sb_null_terminate(mem_arena *arena, strb *sb) {
+  if (!sb) return;
+  if (!(*sb)) return;
+
+  size_t len = darr_len((*sb));
+  if (!len) return;
+  if (darr_last((*sb)) != '\0') darr_push(arena, (*sb), '\0');
+} /* sb_null_terminate() */
+
+MEM_ARENA_DEF void sb_null_pop(strb *sb) {
+  if (!sb) return;
+  if (!(*sb)) return;
+
+  size_t len = darr_len((*sb));
+  if (!len) return;
+  if (darr_last((*sb)) == '\0') darr_pop((*sb));
+} /* sb_null_popn() */
+
+MEM_ARENA_DEF bool sb_insert(mem_arena *arena, strb *sb, char c, size_t n) {
+  if (!sb) return false;
+  if (!(*sb)) return false;
+  sb_null_pop(sb);
+
+  size_t len = sb_strlen((*sb));
+  size_t cap = darr_cap((*sb));
+  if (n > len) n = len;
+
+  if (len >= cap - 1) {
+    char *tmp = darr__grow_impl(arena, (*sb), sizeof(char));
+    if (!tmp) {
+      sb_null_terminate(arena, sb);
+      return false;
+    }
+    (*sb) = tmp;
+  }
+
+  if (n < len) {
+    size_t bytes_to_move = len - n;
+    memmove((*sb) + n + 1, (*sb) + n, bytes_to_move);
+  }
+
+  (*sb)[n] = c;
+  ((darr_header *)(*sb) - 1)->data.count++;
+  sb_null_terminate(arena, sb);
+
+  return true;
+} /* sb_insert() */
+
+MEM_ARENA_DEF bool sb_append(mem_arena *arena, strb *sb, char c) {
+  return sb_insert(arena, sb, c, sb_strlen((*sb)));
+} /* sb_append() */
+
+MEM_ARENA_DEF char *sb__build_string_impl(mem_arena *arena, const char *strlit, size_t len) {
+  char *arr = darr__initialization_impl(arena, sizeof(char), len + 1);
+  if (!arr) return NULL;
+
+  memcpy(arr, strlit, len + 1);
+  ((darr_header *)arr - 1)->data.count = len + 1;
+  return arr;
+} /* darr_darr_init_strlit() */
+
+#endif // MEM_ARENA_STRING_BUILDER_IMPLEMENTATION
+
 #ifdef MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
 
-MEM_ARENA_DEF void *arr__initialization_impl(mem_arena *arena, size_t elem_size, size_t count) {
+MEM_ARENA_DEF void *darr__initialization_impl(mem_arena *arena, size_t elem_size, size_t count) {
   if (!elem_size) return NULL;
   if ((elem_size != 0) && (count > SIZE_MAX / elem_size)) return NULL;
-  size_t total_size = sizeof(arr_header) + (elem_size * count);
-  arr_header *header = arena_alloc(arena, total_size);
+  size_t total_size = sizeof(darr_header) + (elem_size * count);
+  darr_header *header = arena_alloc(arena, total_size);
   if (!header) return NULL;
 
   header->data.count = 0;
   header->data.cap = count;
 
   return header + 1;
-} /* arr__initialization_impl() */
+} /* darr__initialization_impl() */
 
-MEM_ARENA_DEF void *arr__grow_impl(mem_arena *arena, void *arr, size_t elem_size) {
+MEM_ARENA_DEF void *darr__grow_impl(mem_arena *arena, void *arr, size_t elem_size) {
   if (!elem_size) return NULL;
-  arr_header *header;
+  darr_header *header;
 
   if (!arr) {
     if ((elem_size != 0) && (DYNAMIC_ARRAY_INIT_CAPACITY > SIZE_MAX / elem_size)) return NULL;
-    header = arena_alloc(arena, sizeof(arr_header) + (elem_size * DYNAMIC_ARRAY_INIT_CAPACITY));
+    header = arena_alloc(arena, sizeof(darr_header) + (elem_size * DYNAMIC_ARRAY_INIT_CAPACITY));
     if (!header) return NULL;
 
     header->data.count = 0;
     header->data.cap = DYNAMIC_ARRAY_INIT_CAPACITY;
   } else {
-    header = (arr_header *)arr - 1;
+    header = (darr_header *)arr - 1;
     if (header->data.cap > SIZE_MAX / 2) return NULL;
 
     size_t new_cap = (header->data.cap) ? header->data.cap * 2 : DYNAMIC_ARRAY_INIT_CAPACITY;
     if (elem_size != 0 && new_cap > SIZE_MAX / elem_size) return NULL;
 
-    size_t old_size = sizeof(arr_header) + (elem_size * header->data.cap);
-    size_t new_size = sizeof(arr_header) + (elem_size * new_cap);
+    size_t old_size = sizeof(darr_header) + (elem_size * header->data.cap);
+    size_t new_size = sizeof(darr_header) + (elem_size * new_cap);
 
-    arr_header *new_header = arena_realloc(arena, header, old_size, new_size);
+    darr_header *new_header = arena_realloc(arena, header, old_size, new_size);
     if (!new_header) return NULL;
 
     header = new_header;
     header->data.cap = new_cap;
   }
   return header + 1;
-} /* arr__grow_impl() */
+} /* darr__grow_impl() */
 
 #endif // MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
 
