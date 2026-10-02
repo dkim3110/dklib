@@ -1,4 +1,4 @@
-# `mem_arena.h` — Header-only library for vitual memory arenas
+# `mem_arena.h` — Header-only Library for Virtual Memory Arenas
 
 ## Usage
 
