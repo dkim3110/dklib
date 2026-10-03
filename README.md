@@ -1,12 +1,14 @@
-# `mem_arena.h` — Header-only Library for Virtual Memory Arenas
+# `mem_arena.h` — Virtual Memory Arena Allocator
+
+Header-only library à la [stb](https://github.com/nothings/stb) for a virtual memory [arena allocator](https://en.wikipedia.org/wiki/Region-based_memory_management) written in C.
 
 ## Usage
 
-Macros that enable function definitions (excluding the MAKE_STATIC macros) must only be defined once in one source file. See [here](https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt) for more information.
+Macros that enable function definitions (excluding the MAKE_STATIC macros) must only be defined once in one source file before including the header. See [here](https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt) for more information.
 
-On Linux/POSIX systems, define _DEFAULT_SOURCE before including the header to ensure functions are properly exposed.
+This library requires GCC or Clang with GNU C extensions, so compile with `-std=gnu11`. It targets Linux and Windows only. Windows support is written against the Win32 API but untested.
 
-This library relies on GNU C extensions. It is fully compatible with GCC and Clang. To compile on Windows using Visual Studio, you must use the ClangCL toolset.
+This library does not concern itself with C++ support.
 
 ### Flags
 
@@ -19,36 +21,61 @@ This library relies on GNU C extensions. It is fully compatible with GCC and Cla
 - `MEM_ARENA_GIMME_STRING_BUILDER`: enable string function declarations + definitions
 - `MEM_ARENA_GIMME_ALL`: define all of the above
 - `MEM_ARENA_GIMME_ALL_DEC`: include all declarations; no definitions
-- `MEM_ARENA_MAKE_STATIC`: make all functions static inline + include definitions
+- `MEM_ARENA_MAKE_STATIC`: make all functions static inline + `MEM_ARENA_IMPLEMENTATION`
 - `MEM_ARENA_GIMME_ALL_MAKE_STATIC`: same as `MEM_ARENA_GIMME_ALL` but all functions are static inline
 
 ### Optional Function Parameters
 
-Several function-like macros (`arena_init()`, `arena_alloc()`, `sb_remove()`, etc.) accept optional parameters. You can override the defaults using C99 designated initializers:
+Several function-like macros (`arena_init()`, `arena_alloc()`, `sb_remove()`, etc.) accept optional parameters. You can set custom values:
 
 ```C
-arena_init(.reserve_size = MiB(500), .name = "Arena");
+mem_arena *arena = arena_init(.reserve_size = MiB(500), .name = "Arena");
 ```
 
 Consult the parameter structs in the header for a full list of defaults.
 
+### OOM Handler Function
+
+This library provides a default oom handler that exits the program with an error code. You can use your own handler if you so choose.
+
+```C
+mem_arena *arena = arena_init(.oom_handler = custom_function);
+```
+
+### Thread Safety
+
+Not safe at all.
+
 ### Example Code
 
 ```C
-#define _DEFAULT_SOURCE
+// exactly one file
 #define MEM_ARENA_GIMME_ALL
 #include "mem_arena.h"
 
-#include <stdio.h>
+// everywhere else
+#define MEM_ARENA_GIMME_ALL_DEC
+#include "mem_arena.h"
+
+#include <stdio.h> /* mem_arena.h already includes it so technically redundant */
 
 int main(void) {
-  mem_arena *arena = arena_init(.name = "Main Arena");
-  strb text = build_string(arena, "Hello, World");
+  mem_arena *arena = arena_init(.name = "Main Arena"); /* Initialize arena */
+  if (!arena) return 1;
   
-  sb_append(arena, text, '!');  
-  printf("%s\n", text); /* "Hello, World!" */
+  strb text = build_strb(arena, "Hello, World"); /* Initialize string builder */
+  size_t pos = arena->pos;
+  size_t *numbers = darr_init(arena, size_t, 10); /* Initialize dynamic array */
   
-  arena_delete(arena); 
+  for (size_t n = 0; n < 20; n++) {
+    darr_push(arena, numbers, n); /* return values rarely need checking thanks to the oom handler */
+  }
+  
+  sb_append(arena, text, '!');
+  printf("%s\n", text);
+  
+  arena_rewind(arena, pos); /* rewind arena to saved position */
+  arena_delete(arena); /* deallocate all at once */
   return 0;
 }
 ```
