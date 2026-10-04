@@ -1,5 +1,3 @@
-#define MEM_ARENA_GIMME_ALL
-
 // mem_arena.h - public domain - Daniel Inhoi Kim, 2026
 // Header-only library for virtual memory arenas.
 // See end of file for license information.
@@ -26,9 +24,6 @@
  * file before including the header. See
  * https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt for more info.
  */
-
-#ifndef MEM_ARENA_H_
-#define MEM_ARENA_H_
 
 #ifdef MEM_ARENA_GIMME_ALL_MAKE_STATIC
   #define MEM_ARENA_GIMME_ALL
@@ -101,6 +96,9 @@
 #else
   #error "Unsupported Operating System"
 #endif // OPERATING SYSTEM
+
+#ifndef MEM_ARENA_H_
+#define MEM_ARENA_H_
 
 #include <stdalign.h>
 #include <stdbool.h>
