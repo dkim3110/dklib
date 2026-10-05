@@ -16,7 +16,7 @@
 // - MEM_ARENA_GIMME_ALL: define all of the above
 // - MEM_ARENA_GIMME_ALL_DEC: include all declarations; no definitions
 //
-// - MEM_ARENA_MAKE_STATIC: make all functions static inline + MEM_ARENA_IMPLEMENTATION
+// - MEM_ARENA_IMPLEMENTATION_MAKE_STATIC: make all functions static inline + MEM_ARENA_IMPLEMENTATION
 // - MEM_ARENA_GIMME_ALL_MAKE_STATIC: same as MEM_ARENA_GIMME_ALL but all functions are static inline
 
 /*
@@ -27,7 +27,7 @@
 
 #ifdef MEM_ARENA_GIMME_ALL_MAKE_STATIC
   #define MEM_ARENA_GIMME_ALL
-  #define MEM_ARENA_MAKE_STATIC
+  #define MEM_ARENA_IMPLEMENTATION_MAKE_STATIC
 #endif // MEM_ARENA_GIMME_ALL_MAKE_STATIC
 
 #ifdef MEM_ARENA_GIMME_ALL
@@ -41,7 +41,7 @@
   #define MEM_ARENA_STRING_BUILDER
 #endif // MEM_ARENA_GIMME_ALL_DEC
 
-#ifdef MEM_ARENA_MAKE_STATIC
+#ifdef MEM_ARENA_IMPLEMENTATION_MAKE_STATIC
   #define MEM_ARENA_DEF static inline
   #define MEM_ARENA_DEC static inline
 
@@ -57,7 +57,7 @@
 #else
   #define MEM_ARENA_DEF
   #define MEM_ARENA_DEC extern
-#endif // MEM_ARENA_MAKE_STATIC
+#endif // MEM_ARENA_IMPLEMENTATION_MAKE_STATIC
 
 #ifdef MEM_ARENA_GIMME_DYNAMIC_ARRAY
   #define MEM_ARENA_DYNAMIC_ARRAY
@@ -73,9 +73,11 @@
   #define MEM_ARENA_STRING_BUILDER
   #define MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
 #endif // MEM_ARENA_STRING_BUILDER_IMPLEMENTATION
+
 #ifdef MEM_ARENA_STRING_BUILDER
   #define MEM_ARENA_DYNAMIC_ARRAY
 #endif // MEM_ARENA_STRING_BUILDER
+
 #ifdef MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
   #define MEM_ARENA_DYNAMIC_ARRAY
 #endif // MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
@@ -110,7 +112,6 @@
 
 typedef struct mem_arena mem_arena;
 struct mem_arena {
-  uint32_t page_size;                      // system page size
   size_t reserve;                          // total virtual memory reserved
   size_t commit;                           // virtual memory to commit at a time
   size_t pos;                              // current pointer position
@@ -174,6 +175,8 @@ MEM_ARENA_DEC bool impl_arena__sys_mem_release(void *, size_t);
 #if defined(MEM_ARENA_IMPLEMENTATION) && !defined(MEM_ARENA_IMPLEMENTATION_GUARD)
 #define MEM_ARENA_IMPLEMENTATION_GUARD
 
+static uint32_t g_page_size; // system page size
+
 MEM_ARENA_DEF void arena_oom_handler(mem_arena *arena, size_t requested_size) {
   fprintf(stderr,
           "[mem_arena%s%s] OUT OF MEMORY\n"
@@ -230,7 +233,7 @@ MEM_ARENA_DEF mem_arena *impl_arena__initialization(impl_arena__init_params para
     return NULL;
   }
 
-  arena->page_size = page_size;
+  g_page_size = page_size;
   arena->reserve = params.reserve_size;
   arena->commit = params.commit_size;
   arena->pos = MEM_ARENA_BASE_POS;
@@ -308,12 +311,12 @@ MEM_ARENA_DEF void impl_arena__clearing(mem_arena *arena, bool do_decommit) {
   if (!arena) return;
 
   if (do_decommit) {
-    if (arena->commit_pos > arena->page_size) {
-      size_t decommit_size = arena->commit_pos - arena->page_size;
-      uint8_t *decommit_ptr = (uint8_t *)arena + arena->page_size;
+    if (arena->commit_pos > g_page_size) {
+      size_t decommit_size = arena->commit_pos - g_page_size;
+      uint8_t *decommit_ptr = (uint8_t *)arena + g_page_size;
 
       impl_arena__sys_mem_decommit(decommit_ptr, decommit_size);
-      arena->commit_pos = arena->page_size;
+      arena->commit_pos = g_page_size;
     }
   }
 

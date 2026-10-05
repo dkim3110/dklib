@@ -21,7 +21,7 @@ This library does not concern itself with C++ support.
 - `MEM_ARENA_GIMME_STRING_BUILDER`: enable string function declarations + definitions
 - `MEM_ARENA_GIMME_ALL`: define all of the above
 - `MEM_ARENA_GIMME_ALL_DEC`: include all declarations; no definitions
-- `MEM_ARENA_MAKE_STATIC`: make all functions static inline + `MEM_ARENA_IMPLEMENTATION`
+- `MEM_ARENA_IMPLEMENTATION_MAKE_STATIC`: `MEM_ARENA_IMPLEMENTATION` but make all functions static inline
 - `MEM_ARENA_GIMME_ALL_MAKE_STATIC`: same as `MEM_ARENA_GIMME_ALL` but all functions are static inline
 
 ### Optional Function Parameters
