@@ -125,12 +125,12 @@ typedef struct {
   size_t commit_size;                       // default: 2 MiB
   void (*oom_handler)(mem_arena *, size_t); // default: arena_oom_handler()
   const char *name;                         // default: NULL
-} arena__init_params;
+} impl_arena__init_params;
 
 typedef struct {
   uint8_t dummy; // dummy field for initialization
   size_t align;  // default: MEM_ARENA_ALIGN
-} arena__alloc_params;
+} impl_arena__alloc_params;
 
 #define MEM_ARENA_ALIGN_UP_POW2(n, p) (((size_t)(n) + ((size_t)(p) - 1)) & (~((size_t)(p) - 1)))
 #define MEM_ARENA_ALIGN_UP(n, a)      ((((size_t)(n) + ((size_t)(a) - 1)) / (size_t)(a)) * (size_t)(a))
@@ -141,16 +141,16 @@ typedef struct {
 #define MiB(n) ((size_t)(n) << 20)
 #define GiB(n) ((size_t)(n) << 30)
 
-#define arena_init(...) arena__initialization_impl((arena__init_params){.dummy = 0, __VA_ARGS__})
+#define arena_init(...) impl_arena__initialization((impl_arena__init_params){.dummy = 0, __VA_ARGS__})
 
 #define arena_alloc(arena, size, ...)                                                                                  \
-  arena__allocation_impl((arena), (arena__alloc_params){.dummy = 0, __VA_ARGS__}, (size), false)
+  impl_arena__allocation((arena), (impl_arena__alloc_params){.dummy = 0, __VA_ARGS__}, (size), false)
 
 #define arena_calloc(arena, count, size, ...)                                                                          \
-  arena__callocation_impl((arena), (arena__alloc_params){.dummy = 0, __VA_ARGS__}, (count), (size))
+  impl_arena__callocation((arena), (impl_arena__alloc_params){.dummy = 0, __VA_ARGS__}, (count), (size))
 
 #define arena_realloc(arena, ptr, old_size, new_size, ...)                                                             \
-  arena__reallocation_impl((arena), (arena__alloc_params){.dummy = 0, __VA_ARGS__}, (ptr), (old_size), (new_size))
+  impl_arena__reallocation((arena), (impl_arena__alloc_params){.dummy = 0, __VA_ARGS__}, (ptr), (old_size), (new_size))
 
 MEM_ARENA_DEC void arena_oom_handler(mem_arena *, size_t);
 MEM_ARENA_DEC void arena_delete(mem_arena *);
@@ -158,16 +158,16 @@ MEM_ARENA_DEC void arena_rewind(mem_arena *, size_t);
 MEM_ARENA_DEC void arena_clear(mem_arena *);
 MEM_ARENA_DEC void arena_reset(mem_arena *);
 
-MEM_ARENA_DEC mem_arena *arena__initialization_impl(arena__init_params);
-MEM_ARENA_DEC void *arena__allocation_impl(mem_arena *, arena__alloc_params, size_t, bool);
-MEM_ARENA_DEC void *arena__callocation_impl(mem_arena *, arena__alloc_params, size_t, size_t);
-MEM_ARENA_DEC void *arena__reallocation_impl(mem_arena *, arena__alloc_params, void *, size_t, size_t);
-MEM_ARENA_DEC void arena__clearing_impl(mem_arena *, bool);
-MEM_ARENA_DEC uint32_t arena__sys_get_pagesize(void);
-MEM_ARENA_DEC void *arena__sys_mem_reserve(size_t);
-MEM_ARENA_DEC bool arena__sys_mem_commit(void *, size_t);
-MEM_ARENA_DEC bool arena__sys_mem_decommit(void *, size_t);
-MEM_ARENA_DEC bool arena__sys_mem_release(void *, size_t);
+MEM_ARENA_DEC mem_arena *impl_arena__initialization(impl_arena__init_params);
+MEM_ARENA_DEC void *impl_arena__allocation(mem_arena *, impl_arena__alloc_params, size_t, bool);
+MEM_ARENA_DEC void *impl_arena__callocation(mem_arena *, impl_arena__alloc_params, size_t, size_t);
+MEM_ARENA_DEC void *impl_arena__reallocation(mem_arena *, impl_arena__alloc_params, void *, size_t, size_t);
+MEM_ARENA_DEC void impl_arena__clearing(mem_arena *, bool);
+MEM_ARENA_DEC uint32_t impl_arena__sys_get_pagesize(void);
+MEM_ARENA_DEC void *impl_arena__sys_mem_reserve(size_t);
+MEM_ARENA_DEC bool impl_arena__sys_mem_commit(void *, size_t);
+MEM_ARENA_DEC bool impl_arena__sys_mem_decommit(void *, size_t);
+MEM_ARENA_DEC bool impl_arena__sys_mem_release(void *, size_t);
 
 #endif // MEM_ARENA_H_
 
@@ -188,7 +188,7 @@ MEM_ARENA_DEF void arena_oom_handler(mem_arena *arena, size_t requested_size) {
 } /* arena_oom_handler() */
 
 MEM_ARENA_DEF void arena_delete(mem_arena *arena) {
-  if (arena) arena__sys_mem_release(arena, arena->reserve);
+  if (arena) impl_arena__sys_mem_release(arena, arena->reserve);
 } /* arena_delete() */
 
 MEM_ARENA_DEF void arena_rewind(mem_arena *arena, size_t pos) {
@@ -200,21 +200,21 @@ MEM_ARENA_DEF void arena_rewind(mem_arena *arena, size_t pos) {
 } /* arena_rewind() */
 
 MEM_ARENA_DEF void arena_clear(mem_arena *arena) {
-  arena__clearing_impl(arena, false);
+  impl_arena__clearing(arena, false);
 } /* arena_clear() */
 
 MEM_ARENA_DEF void arena_reset(mem_arena *arena) {
-  arena__clearing_impl(arena, true);
+  impl_arena__clearing(arena, true);
 } /* arena_reset() */
 
-MEM_ARENA_DEF mem_arena *arena__initialization_impl(arena__init_params params) {
+MEM_ARENA_DEF mem_arena *impl_arena__initialization(impl_arena__init_params params) {
   if (!params.reserve_size) params.reserve_size = GiB(1);
   if (!params.commit_size) params.commit_size = MiB(2);
   if (!params.oom_handler) params.oom_handler = arena_oom_handler;
 
   if (params.commit_size > params.reserve_size) params.commit_size = params.reserve_size;
 
-  uint32_t page_size = arena__sys_get_pagesize();
+  uint32_t page_size = impl_arena__sys_get_pagesize();
   if ((!page_size) || ((page_size & (page_size - 1)) != 0)) return NULL;
 
   params.reserve_size += MEM_ARENA_BASE_POS;
@@ -223,10 +223,10 @@ MEM_ARENA_DEF mem_arena *arena__initialization_impl(arena__init_params params) {
   params.reserve_size = MEM_ARENA_ALIGN_UP_POW2(params.reserve_size, page_size);
   params.commit_size = MEM_ARENA_ALIGN_UP_POW2(params.commit_size, page_size);
 
-  mem_arena *arena = arena__sys_mem_reserve(params.reserve_size);
+  mem_arena *arena = impl_arena__sys_mem_reserve(params.reserve_size);
   if (!arena) return NULL;
-  if (!arena__sys_mem_commit(arena, page_size)) {
-    arena__sys_mem_release(arena, params.reserve_size);
+  if (!impl_arena__sys_mem_commit(arena, page_size)) {
+    impl_arena__sys_mem_release(arena, params.reserve_size);
     return NULL;
   }
 
@@ -238,9 +238,10 @@ MEM_ARENA_DEF mem_arena *arena__initialization_impl(arena__init_params params) {
   arena->name = params.name;
   arena->handle_oom = params.oom_handler;
   return arena;
-} /* arena__initialization_impl() */
+} /* impl_arena__initialization() */
 
-MEM_ARENA_DEF void *arena__allocation_impl(mem_arena *arena, arena__alloc_params params, size_t size, bool zero_out) {
+MEM_ARENA_DEF void *impl_arena__allocation(mem_arena *arena, impl_arena__alloc_params params, size_t size,
+                                           bool zero_out) {
   if (!arena) return NULL;
 
   if (!params.align) params.align = MEM_ARENA_ALIGN;
@@ -258,7 +259,7 @@ MEM_ARENA_DEF void *arena__allocation_impl(mem_arena *arena, arena__alloc_params
     uint8_t *mem = (uint8_t *)arena + arena->commit_pos;
     size_t commit_size = new_commit_pos - arena->commit_pos;
 
-    if (!arena__sys_mem_commit(mem, commit_size)) goto error_oom;
+    if (!impl_arena__sys_mem_commit(mem, commit_size)) goto error_oom;
     arena->commit_pos = new_commit_pos;
   }
 
@@ -272,37 +273,38 @@ MEM_ARENA_DEF void *arena__allocation_impl(mem_arena *arena, arena__alloc_params
 error_oom:
   arena->handle_oom(arena, size);
   return NULL;
-} /* arena__allocation_impl() */
+} /* impl_arena__allocation() */
 
-MEM_ARENA_DEF void *arena__callocation_impl(mem_arena *arena, arena__alloc_params params, size_t count, size_t size) {
+MEM_ARENA_DEF void *impl_arena__callocation(mem_arena *arena, impl_arena__alloc_params params, size_t count,
+                                            size_t size) {
   if ((!size) || (!arena)) return NULL;
   if (count > SIZE_MAX / size) goto error_oom;
-  return arena__allocation_impl(arena, params, count * size, true);
+  return impl_arena__allocation(arena, params, count * size, true);
 
 error_oom:
   arena->handle_oom(arena, SIZE_MAX);
   return NULL;
-} /* arena__callocation_impl */
+} /* impl_arena__callocation */
 
-MEM_ARENA_DEF void *arena__reallocation_impl(mem_arena *arena, arena__alloc_params params, void *ptr, size_t old_size,
-                                             size_t new_size) {
+MEM_ARENA_DEF void *impl_arena__reallocation(mem_arena *arena, impl_arena__alloc_params params, void *ptr,
+                                             size_t old_size, size_t new_size) {
   if (!arena) return NULL;
-  if ((!ptr) || (!old_size)) return arena__allocation_impl(arena, params, new_size, false);
+  if ((!ptr) || (!old_size)) return impl_arena__allocation(arena, params, new_size, false);
   if (new_size <= old_size) return ptr;
   size_t ptr_offset = (size_t)((uint8_t *)ptr - (uint8_t *)arena);
   bool is_most_recent = (ptr_offset + old_size == arena->pos);
 
   if (is_most_recent) {
-    if (!arena__allocation_impl(arena, (arena__alloc_params){.align = 1}, new_size - old_size, false)) return NULL;
+    if (!impl_arena__allocation(arena, (impl_arena__alloc_params){.align = 1}, new_size - old_size, false)) return NULL;
     return ptr;
   }
 
-  void *new_ptr = arena__allocation_impl(arena, params, new_size, false);
+  void *new_ptr = impl_arena__allocation(arena, params, new_size, false);
   if (new_ptr) memcpy(new_ptr, ptr, old_size);
   return new_ptr;
-} /* arena__reallocation_impl() */
+} /* impl_arena__reallocation() */
 
-MEM_ARENA_DEF void arena__clearing_impl(mem_arena *arena, bool do_decommit) {
+MEM_ARENA_DEF void impl_arena__clearing(mem_arena *arena, bool do_decommit) {
   if (!arena) return;
 
   if (do_decommit) {
@@ -310,15 +312,15 @@ MEM_ARENA_DEF void arena__clearing_impl(mem_arena *arena, bool do_decommit) {
       size_t decommit_size = arena->commit_pos - arena->page_size;
       uint8_t *decommit_ptr = (uint8_t *)arena + arena->page_size;
 
-      arena__sys_mem_decommit(decommit_ptr, decommit_size);
+      impl_arena__sys_mem_decommit(decommit_ptr, decommit_size);
       arena->commit_pos = arena->page_size;
     }
   }
 
   arena_rewind(arena, MEM_ARENA_BASE_POS);
-} /* arena__clearing_impl() */
+} /* impl_arena__clearing() */
 
-MEM_ARENA_DEF uint32_t arena__sys_get_pagesize(void) {
+MEM_ARENA_DEF uint32_t impl_arena__sys_get_pagesize(void) {
 #ifdef MEM_ARENA_IS_LINUX
   return (uint32_t)sysconf(_SC_PAGESIZE);
 #elif defined(MEM_ARENA_IS_WINDOWS)
@@ -326,42 +328,42 @@ MEM_ARENA_DEF uint32_t arena__sys_get_pagesize(void) {
   GetSystemInfo(&sys_info);
   return sys_info.dwPageSize;
 #endif
-} /* arena__sys_get_pagesize() */
+} /* impl_arena__sys_get_pagesize() */
 
-MEM_ARENA_DEF void *arena__sys_mem_reserve(size_t size) {
+MEM_ARENA_DEF void *impl_arena__sys_mem_reserve(size_t size) {
 #ifdef MEM_ARENA_IS_LINUX
   void *out = mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
   return (out == MAP_FAILED) ? NULL : out;
 #elif defined(MEM_ARENA_IS_WINDOWS)
   return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_NOACCESS);
 #endif
-} /* arena__sys_mem_reserve() */
+} /* impl_arena__sys_mem_reserve() */
 
-MEM_ARENA_DEF bool arena__sys_mem_commit(void *ptr, size_t size) {
+MEM_ARENA_DEF bool impl_arena__sys_mem_commit(void *ptr, size_t size) {
 #ifdef MEM_ARENA_IS_LINUX
   return (mprotect(ptr, size, PROT_READ | PROT_WRITE) == 0);
 #elif defined(MEM_ARENA_IS_WINDOWS)
   return (VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE));
 #endif
-} /* arena__sys_mem_commit() */
+} /* impl_arena__sys_mem_commit() */
 
-MEM_ARENA_DEF bool arena__sys_mem_decommit(void *ptr, size_t size) {
+MEM_ARENA_DEF bool impl_arena__sys_mem_decommit(void *ptr, size_t size) {
 #ifdef MEM_ARENA_IS_LINUX
   if (mprotect(ptr, size, PROT_NONE) != 0) return false;
   return (madvise(ptr, size, MADV_DONTNEED) == 0);
 #elif defined(MEM_ARENA_IS_WINDOWS)
   return VirtualFree(ptr, size, MEM_DECOMMIT);
 #endif
-} /* arena__sys_mem_decommit() */
+} /* impl_arena__sys_mem_decommit() */
 
-MEM_ARENA_DEF bool arena__sys_mem_release(void *ptr, size_t size) {
+MEM_ARENA_DEF bool impl_arena__sys_mem_release(void *ptr, size_t size) {
 #ifdef MEM_ARENA_IS_LINUX
   return (munmap(ptr, size) == 0);
 #elif defined(MEM_ARENA_IS_WINDOWS)
   (void)size;
   return VirtualFree(ptr, 0, MEM_RELEASE);
 #endif
-} /* arena__sys_mem_release() */
+} /* impl_arena__sys_mem_release() */
 
 #endif // MEM_ARENA_IMPLEMENTATION
 
@@ -375,20 +377,20 @@ typedef char *strb; // string builder
 typedef struct {
   uint8_t dummy;   // dummy field for initialization
   bool ignore_ord; // default: false
-} sb__remove_params;
+} impl_sb__remove_params;
 
-#define build_strb(arena, str)       sb__build_strb_impl((arena), (str), strlen(str))
-#define sb_null_terminate(arena, sb) sb__push_null_impl((arena), &(sb))
-#define sb_tolower(sb)               sb__letter_case_shift_impl(&(sb), true)
-#define sb_toupper(sb)               sb__letter_case_shift_impl(&(sb), false)
-#define sb_insert(arena, sb, c, n)   sb__insertion_impl((arena), &(sb), (c), (n))
-#define sb_concat(arena, sb1, sb2)   sb__concatenation_impl((arena), &(sb1), (sb2))
-#define sb_append(arena, sb, c)      sb__insertion_impl((arena), &(sb), (c), sb_strlen(sb))
-#define sb_remove(sb, n, ...)        sb__removal_impl(&(sb), (n), (sb__remove_params){.dummy = 0, __VA_ARGS__})
-#define sb_reverse(sb)               sb__reversal_impl(&(sb))
-#define sb_ltrim(sb)                 sb__trim_impl(&(sb), true)
-#define sb_rtrim(sb)                 sb__trim_impl(&(sb), false)
-#define sb_trim(sb)                  sb__trim_both_impl(&(sb))
+#define build_strb(arena, str)       impl_sb__build_strb((arena), (str), strlen(str))
+#define sb_null_terminate(arena, sb) impl_sb__push_null((arena), &(sb))
+#define sb_tolower(sb)               impl_sb__letter_case_shift(&(sb), true)
+#define sb_toupper(sb)               impl_sb__letter_case_shift(&(sb), false)
+#define sb_insert(arena, sb, c, n)   impl_sb__insertion((arena), &(sb), (c), (n))
+#define sb_concat(arena, sb1, sb2)   impl_sb__concatenation((arena), &(sb1), (sb2))
+#define sb_append(arena, sb, c)      impl_sb__insertion((arena), &(sb), (c), sb_strlen(sb))
+#define sb_remove(sb, n, ...)        impl_sb__removal(&(sb), (n), (impl_sb__remove_params){.dummy = 0, __VA_ARGS__})
+#define sb_reverse(sb)               impl_sb__reversal(&(sb))
+#define sb_ltrim(sb)                 impl_sb__trim(&(sb), true)
+#define sb_rtrim(sb)                 impl_sb__trim(&(sb), false)
+#define sb_trim(sb)                  impl_sb__trim_both(&(sb))
 
 MEM_ARENA_DEC size_t sb_strlen(strb);
 MEM_ARENA_DEC bool sb_isempty(strb);
@@ -398,17 +400,17 @@ MEM_ARENA_DEC bool sb_equals_ic(strb, strb);
 MEM_ARENA_DEC int sb_compare(strb, strb);
 MEM_ARENA_DEC uint32_t sb_hash(strb);
 
-MEM_ARENA_DEC strb sb__build_strb_impl(mem_arena *, const char *, size_t len);
-MEM_ARENA_DEC void sb__push_null_impl(mem_arena *, strb *);
-MEM_ARENA_DEC void sb__pop_null_impl(strb *);
-MEM_ARENA_DEC void sb__letter_case_shift_impl(strb *, bool);
+MEM_ARENA_DEC strb impl_sb__build_strb(mem_arena *, const char *, size_t len);
+MEM_ARENA_DEC void impl_sb__push_null(mem_arena *, strb *);
+MEM_ARENA_DEC void impl_sb__pop_null(strb *);
+MEM_ARENA_DEC void impl_sb__letter_case_shift(strb *, bool);
 
-MEM_ARENA_DEC bool sb__insertion_impl(mem_arena *, strb *, char, size_t);
-MEM_ARENA_DEC bool sb__concatenation_impl(mem_arena *, strb *, strb);
-MEM_ARENA_DEC bool sb__removal_impl(strb *, size_t, sb__remove_params);
-MEM_ARENA_DEC bool sb__reversal_impl(strb *);
-MEM_ARENA_DEC bool sb__trim_impl(strb *, bool);
-MEM_ARENA_DEC bool sb__trim_both_impl(strb *);
+MEM_ARENA_DEC bool impl_sb__insertion(mem_arena *, strb *, char, size_t);
+MEM_ARENA_DEC bool impl_sb__concatenation(mem_arena *, strb *, strb);
+MEM_ARENA_DEC bool impl_sb__removal(strb *, size_t, impl_sb__remove_params);
+MEM_ARENA_DEC bool impl_sb__reversal(strb *);
+MEM_ARENA_DEC bool impl_sb__trim(strb *, bool);
+MEM_ARENA_DEC bool impl_sb__trim_both(strb *);
 
 #endif // MEM_ARENA_STRING_BUILDER
 
@@ -425,7 +427,7 @@ typedef union {
 
 #define DYNAMIC_ARRAY_INIT_CAPACITY (8)
 
-#define darr_init(arena, type, size) darr__initialization_impl((arena), sizeof(type), (size))
+#define darr_init(arena, type, size) impl_darr__initialization((arena), sizeof(type), (size))
 
 #define darr_len(arr)  ((arr) ? ((darr_header *)(arr) - 1)->data.count : 0)
 #define darr_cap(arr)  ((arr) ? ((darr_header *)(arr) - 1)->data.cap : 0)
@@ -483,7 +485,7 @@ typedef union {
   ({                                                                                                                   \
   bool darr_push__success = true;                                                                                      \
   if (!(arr) || (darr_len(arr) >= darr_cap(arr))) {                                                                    \
-    void *darr_push__tmp = darr__growth_impl((arena), (arr), sizeof(*(arr)));                                          \
+    void *darr_push__tmp = impl_darr__growth((arena), (arr), sizeof(*(arr)));                                          \
     if (darr_push__tmp) (arr) = darr_push__tmp;                                                                        \
     else darr_push__success = false;                                                                                   \
   }                                                                                                                    \
@@ -495,7 +497,7 @@ typedef union {
   ({                                                                                                                   \
   bool darr_reserve__success = false;                                                                                  \
   if (arr) {                                                                                                           \
-    void *darr_reserve__tmp = darr__reserve_impl((arena), (arr), sizeof(*(arr)), (size));                              \
+    void *darr_reserve__tmp = impl_darr__reserve((arena), (arr), sizeof(*(arr)), (size));                              \
     if (darr_reserve__tmp) {                                                                                           \
       (arr) = darr_reserve__tmp;                                                                                       \
       darr_reserve__success = true;                                                                                    \
@@ -504,9 +506,9 @@ typedef union {
   darr_reserve__success;                                                                                               \
   })
 
-MEM_ARENA_DEC void *darr__initialization_impl(mem_arena *, size_t, size_t);
-MEM_ARENA_DEC void *darr__growth_impl(mem_arena *, void *, size_t);
-MEM_ARENA_DEC void *darr__reserve_impl(mem_arena *, void *, size_t, size_t);
+MEM_ARENA_DEC void *impl_darr__initialization(mem_arena *, size_t, size_t);
+MEM_ARENA_DEC void *impl_darr__growth(mem_arena *, void *, size_t);
+MEM_ARENA_DEC void *impl_darr__reserve(mem_arena *, void *, size_t, size_t);
 
 #endif // MEM_ARENA_DYNAMIC_ARRAY
 
@@ -612,35 +614,35 @@ MEM_ARENA_DEF uint32_t sb_hash(strb sb) { /* MurmurHash3 */
   return hash;
 } /* sb_hash() */
 
-MEM_ARENA_DEF strb sb__build_strb_impl(mem_arena *arena, const char *str, size_t len) {
+MEM_ARENA_DEF strb impl_sb__build_strb(mem_arena *arena, const char *str, size_t len) {
   if ((!arena) || (!str)) return NULL;
-  strb sb = darr__initialization_impl(arena, sizeof(char), len + 1);
+  strb sb = impl_darr__initialization(arena, sizeof(char), len + 1);
   if (!sb) return NULL;
 
   memcpy(sb, str, len + 1);
   ((darr_header *)sb - 1)->data.count = len + 1;
   return sb;
-} /* sb__build_strb_impl() */
+} /* impl_sb__build_strb() */
 
-MEM_ARENA_DEF void sb__push_null_impl(mem_arena *arena, strb *sb) {
+MEM_ARENA_DEF void impl_sb__push_null(mem_arena *arena, strb *sb) {
   if (!sb) return;
   if (!(*sb)) return;
 
   size_t len = darr_len(*sb);
   if (!len) return;
   if (darr_last(*sb) != '\0') darr_push(arena, (*sb), '\0');
-} /* sb__push_null_impl() */
+} /* impl_sb__push_null() */
 
-MEM_ARENA_DEF void sb__pop_null_impl(strb *sb) {
+MEM_ARENA_DEF void impl_sb__pop_null(strb *sb) {
   if (!sb) return;
   if (!(*sb)) return;
 
   size_t len = darr_len(*sb);
   if (!len) return;
   if (darr_last(*sb) == '\0') darr_pop(*sb);
-} /* sb__pop_null_impl() */
+} /* impl_sb__pop_null() */
 
-MEM_ARENA_DEF void sb__letter_case_shift_impl(strb *sb, bool to_lower) {
+MEM_ARENA_DEF void impl_sb__letter_case_shift(strb *sb, bool to_lower) {
   if (!sb) return;
   if (sb_isempty(*sb)) return;
 
@@ -648,21 +650,21 @@ MEM_ARENA_DEF void sb__letter_case_shift_impl(strb *sb, bool to_lower) {
     if (to_lower) (*sb)[n] = tolower((unsigned char)(*sb)[n]);
     else (*sb)[n] = toupper((unsigned char)(*sb)[n]);
   }
-} /* sb__letter_case_shift_impl() */
+} /* impl_sb__letter_case_shift() */
 
-MEM_ARENA_DEF bool sb__insertion_impl(mem_arena *arena, strb *sb, char c, size_t n) {
+MEM_ARENA_DEF bool impl_sb__insertion(mem_arena *arena, strb *sb, char c, size_t n) {
   if (!sb) return false;
   if (!(*sb)) return false;
-  sb__pop_null_impl(sb);
+  impl_sb__pop_null(sb);
 
   size_t len = sb_strlen(*sb);
   size_t cap = darr_cap(*sb);
   if (n > len) n = len;
 
   if (len >= ((!cap) ? 0 : cap - 1)) {
-    char *tmp = darr__growth_impl(arena, (*sb), sizeof(char));
+    char *tmp = impl_darr__growth(arena, (*sb), sizeof(char));
     if (!tmp) {
-      sb__push_null_impl(arena, sb);
+      impl_sb__push_null(arena, sb);
       return false;
     }
     (*sb) = tmp;
@@ -675,12 +677,12 @@ MEM_ARENA_DEF bool sb__insertion_impl(mem_arena *arena, strb *sb, char c, size_t
 
   (*sb)[n] = c;
   ((darr_header *)(*sb) - 1)->data.count++;
-  sb__push_null_impl(arena, sb);
+  impl_sb__push_null(arena, sb);
 
   return true;
-} /* sb__insertion_impl() */
+} /* impl_sb__insertion() */
 
-MEM_ARENA_DEF bool sb__concatenation_impl(mem_arena *arena, strb *a, strb b) {
+MEM_ARENA_DEF bool impl_sb__concatenation(mem_arena *arena, strb *a, strb b) {
   if ((!a) || (!b)) return false;
   if (!(*a)) return false;
   if (sb_isempty(b)) return true;
@@ -691,14 +693,14 @@ MEM_ARENA_DEF bool sb__concatenation_impl(mem_arena *arena, strb *a, strb b) {
   if (SIZE_MAX - a_len < b_len) return false;
 
   size_t a_cap = darr_cap(*a);
-  sb__pop_null_impl(a);
+  impl_sb__pop_null(a);
   size_t requested_size = a_len + b_len + 1;
 
   if (requested_size > a_cap) {
     size_t new_cap = requested_size > a_cap * 2 ? requested_size : a_cap * 2;
-    char *tmp = darr__reserve_impl(arena, (*a), sizeof(char), new_cap);
+    char *tmp = impl_darr__reserve(arena, (*a), sizeof(char), new_cap);
     if (!tmp) {
-      sb__push_null_impl(arena, a);
+      impl_sb__push_null(arena, a);
       return false;
     }
     (*a) = tmp;
@@ -706,12 +708,12 @@ MEM_ARENA_DEF bool sb__concatenation_impl(mem_arena *arena, strb *a, strb b) {
 
   memmove((*a) + a_len, b, b_len);
   ((darr_header *)(*a) - 1)->data.count += b_len;
-  sb__push_null_impl(arena, a);
+  impl_sb__push_null(arena, a);
 
   return true;
-} /* sb__concatenation_impl() */
+} /* impl_sb__concatenation() */
 
-MEM_ARENA_DEF bool sb__removal_impl(strb *sb, size_t n, sb__remove_params params) {
+MEM_ARENA_DEF bool impl_sb__removal(strb *sb, size_t n, impl_sb__remove_params params) {
   if (!sb) return false;
   if (sb_isempty(*sb)) return false;
   size_t len = sb_strlen(*sb);
@@ -724,7 +726,7 @@ MEM_ARENA_DEF bool sb__removal_impl(strb *sb, size_t n, sb__remove_params params
     return true;
   }
 
-  sb__pop_null_impl(sb);
+  impl_sb__pop_null(sb);
 
   if (params.ignore_ord) {
     if (!darr_rem((*sb), n)) return false;
@@ -735,9 +737,9 @@ MEM_ARENA_DEF bool sb__removal_impl(strb *sb, size_t n, sb__remove_params params
   (*sb)[len - 1] = '\0';
   ((darr_header *)(*sb) - 1)->data.count++;
   return true;
-} /* sb__removal_impl() */
+} /* impl_sb__removal() */
 
-MEM_ARENA_DEF bool sb__reversal_impl(strb *sb) {
+MEM_ARENA_DEF bool impl_sb__reversal(strb *sb) {
   if (!sb) return false;
   if (sb_isempty(*sb)) return false;
 
@@ -754,9 +756,9 @@ MEM_ARENA_DEF bool sb__reversal_impl(strb *sb) {
   }
 
   return true;
-} /* sb__reversal_impl() */
+} /* impl_sb__reversal() */
 
-MEM_ARENA_DEF bool sb__trim_impl(strb *sb, bool trim_left) {
+MEM_ARENA_DEF bool impl_sb__trim(strb *sb, bool trim_left) {
   if (!sb) return false;
   if (sb_isempty(*sb)) return true;
 
@@ -776,7 +778,7 @@ MEM_ARENA_DEF bool sb__trim_impl(strb *sb, bool trim_left) {
 
   if (trim_left) {
     size_t whitespace_count = 0;
-    sb__pop_null_impl(sb);
+    impl_sb__pop_null(sb);
     for (size_t n = 0; n < len; n++) {
       if (!isspace((unsigned char)(*sb)[n])) break;
       whitespace_count++;
@@ -786,25 +788,25 @@ MEM_ARENA_DEF bool sb__trim_impl(strb *sb, bool trim_left) {
     (*sb)[len - whitespace_count] = '\0';
     ((darr_header *)(*sb) - 1)->data.count = len - whitespace_count + 1;
   } else {
-    sb__pop_null_impl(sb);
+    impl_sb__pop_null(sb);
     while ((len > 0) && (isspace((unsigned char)(*sb)[--len]))) darr_pop(*sb);
     (*sb)[++len] = '\0';
     ((darr_header *)(*sb) - 1)->data.count++;
   }
 
   return true;
-} /* sb__trim_impl() */
+} /* impl_sb__trim() */
 
-MEM_ARENA_DEF bool sb__trim_both_impl(strb *sb) {
-  return (sb__trim_impl(sb, true) && sb__trim_impl(sb, false));
-} /* sb__trim_both_impl() */
+MEM_ARENA_DEF bool impl_sb__trim_both(strb *sb) {
+  return (impl_sb__trim(sb, true) && impl_sb__trim(sb, false));
+} /* impl_sb__trim_both() */
 
 #endif // MEM_ARENA_STRING_BUILDER_IMPLEMENTATION
 
 #if defined(MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION) && !defined(MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION_GUARD)
 #define MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION_GUARD
 
-MEM_ARENA_DEF void *darr__initialization_impl(mem_arena *arena, size_t elem_size, size_t count) {
+MEM_ARENA_DEF void *impl_darr__initialization(mem_arena *arena, size_t elem_size, size_t count) {
   if (!elem_size) return NULL;
   if ((elem_size != 0) && (count > SIZE_MAX / elem_size)) return NULL;
   size_t total_size = sizeof(darr_header) + (elem_size * count);
@@ -815,9 +817,9 @@ MEM_ARENA_DEF void *darr__initialization_impl(mem_arena *arena, size_t elem_size
   header->data.cap = count;
 
   return header + 1;
-} /* darr__initialization_impl() */
+} /* impl_darr__initialization() */
 
-MEM_ARENA_DEF void *darr__growth_impl(mem_arena *arena, void *arr, size_t elem_size) {
+MEM_ARENA_DEF void *impl_darr__growth(mem_arena *arena, void *arr, size_t elem_size) {
   if (!elem_size) return NULL;
   darr_header *header;
 
@@ -845,9 +847,9 @@ MEM_ARENA_DEF void *darr__growth_impl(mem_arena *arena, void *arr, size_t elem_s
     header->data.cap = new_cap;
   }
   return header + 1;
-} /* darr__growth_impl() */
+} /* impl_darr__growth() */
 
-MEM_ARENA_DEF void *darr__reserve_impl(mem_arena *arena, void *arr, size_t elem_size, size_t size) {
+MEM_ARENA_DEF void *impl_darr__reserve(mem_arena *arena, void *arr, size_t elem_size, size_t size) {
   if (!size) return NULL;
   if (!arr) return NULL;
 
@@ -866,7 +868,7 @@ MEM_ARENA_DEF void *darr__reserve_impl(mem_arena *arena, void *arr, size_t elem_
   header->data.cap = size;
 
   return header + 1;
-} /* darr__reserve_impl() */
+} /* impl_darr__reserve() */
 
 #endif // MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
 
