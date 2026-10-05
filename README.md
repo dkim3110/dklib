@@ -56,7 +56,7 @@ int main(void) {
   mem_arena *arena = arena_init(.name = "Main Arena"); /* Initialize arena */
   if (!arena) return 1;
   
-  strb text = build_strb(arena, "Hello, World"); /* Initialize string builder */
+  strb text = sb_build(arena, "Hello, World"); /* Initialize string builder */
   tmp_arena tmp = arena_take_snapshot(arena); /* Begin temporary arena */
   size_t *numbers = darr_init(arena, size_t, 10); /* Initialize dynamic array */
   

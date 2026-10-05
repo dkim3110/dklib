@@ -389,13 +389,14 @@ typedef struct {
   bool ignore_ord; // default: false
 } impl_sb__remove_params;
 
-#define build_strb(arena, str)       impl_sb__build_strb((arena), (str), strlen(str))
+#define sb_build(arena, str)         impl_sb__build((arena), (str), strlen(str))
+#define sb_strdup(arena, sb)         impl_sb__build((arena), (sb), sb_strlen(sb));
 #define sb_null_terminate(arena, sb) impl_sb__push_null((arena), &(sb))
 #define sb_tolower(sb)               impl_sb__letter_case_shift(&(sb), true)
 #define sb_toupper(sb)               impl_sb__letter_case_shift(&(sb), false)
 #define sb_insert(arena, sb, c, n)   impl_sb__insertion((arena), &(sb), (c), (n))
-#define sb_concat(arena, sb1, sb2)   impl_sb__concatenation((arena), &(sb1), (sb2))
 #define sb_append(arena, sb, c)      impl_sb__insertion((arena), &(sb), (c), sb_strlen(sb))
+#define sb_concat(arena, sb1, sb2)   impl_sb__concatenation((arena), &(sb1), (sb2))
 #define sb_remove(sb, n, ...)        impl_sb__removal(&(sb), (n), (impl_sb__remove_params){.dummy = 0, ##__VA_ARGS__})
 #define sb_reverse(sb)               impl_sb__reversal(&(sb))
 #define sb_ltrim(sb)                 impl_sb__trim(&(sb), true)
@@ -410,7 +411,7 @@ MEM_ARENA_DEC bool sb_equals_ic(strb, strb);
 MEM_ARENA_DEC int sb_compare(strb, strb);
 MEM_ARENA_DEC uint32_t sb_hash(strb);
 
-MEM_ARENA_DEC strb impl_sb__build_strb(mem_arena *, const char *, size_t len);
+MEM_ARENA_DEC strb impl_sb__build(mem_arena *, const char *, size_t len);
 MEM_ARENA_DEC bool impl_sb__push_null(mem_arena *, strb *);
 MEM_ARENA_DEC bool impl_sb__pop_null(strb *);
 MEM_ARENA_DEC bool impl_sb__letter_case_shift(strb *, bool);
@@ -623,7 +624,7 @@ MEM_ARENA_DEF uint32_t sb_hash(strb sb) { /* MurmurHash3 */
   return hash;
 } /* sb_hash() */
 
-MEM_ARENA_DEF strb impl_sb__build_strb(mem_arena *arena, const char *str, size_t len) {
+MEM_ARENA_DEF strb impl_sb__build(mem_arena *arena, const char *str, size_t len) {
   if ((!arena) || (!str)) return NULL;
   strb sb = impl_darr__initialization(arena, sizeof(char), len + 1);
   if (!sb) return NULL;
@@ -631,7 +632,7 @@ MEM_ARENA_DEF strb impl_sb__build_strb(mem_arena *arena, const char *str, size_t
   memcpy(sb, str, len + 1);
   ((darr_header *)sb - 1)->data.count = len + 1;
   return sb;
-} /* impl_sb__build_strb() */
+} /* impl_sb__build() */
 
 MEM_ARENA_DEF bool impl_sb__push_null(mem_arena *arena, strb *sb) {
   if (!sb) return false;
@@ -729,8 +730,8 @@ MEM_ARENA_DEF bool impl_sb__concatenation(mem_arena *arena, strb *a, strb b) {
 MEM_ARENA_DEF bool impl_sb__removal(strb *sb, size_t n, impl_sb__remove_params params) {
   if (!sb) return false;
   if (sb_isempty(*sb)) return false;
-  size_t len = sb_strlen(*sb);
 
+  size_t len = sb_strlen(*sb);
   if (n >= len) return false;
 
   if (len == 1) {
