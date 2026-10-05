@@ -36,15 +36,13 @@ Consult the parameter structs in the header for a full list of defaults.
 
 ### OOM Handler Function
 
-This library provides a default oom handler that exits the program with an error code. You can use your own handler if you so choose.
+This library provides a default oom handler that exits the program with an error code. You can use your own handler if you so choose. 
+
+*It is recommended that the custom oom handler exits the program.*
 
 ```C
 mem_arena *arena = arena_init(.oom_handler = custom_function);
 ```
-
-### Thread Safety
-
-Not safe at all.
 
 ### Example Code
 
@@ -59,17 +57,18 @@ int main(void) {
   if (!arena) return 1;
   
   strb text = build_strb(arena, "Hello, World"); /* Initialize string builder */
-  size_t pos = arena_get_pos(arena);
+  tmp_arena tmp = arena_take_snapshot(arena); /* Begin temporary arena */
   size_t *numbers = darr_init(arena, size_t, 10); /* Initialize dynamic array */
   
   for (size_t n = 0; n < 20; n++) {
-    darr_push(arena, numbers, n); /* return values rarely need checking thanks to the oom handler */
+    darr_push(arena, numbers, n); 
   }
+  
+  arena_drop_snapshot(tmp); /* end temporary arena */
   
   sb_append(arena, text, '!');
   printf("%s\n", text);
-  
-  arena_rewind(arena, pos); /* rewind arena to saved position */
+    
   arena_delete(arena); /* deallocate all at once */
   return 0;
 }
