@@ -19,9 +19,9 @@ This library does not concern itself with C++ support.
 - `MEM_ARENA_STRING_BUILDER`: enable string function declarations
 - `MEM_ARENA_STRING_BUILDER_IMPLEMENTATION`: enable string function definitions
 - `MEM_ARENA_GIMME_STRING_BUILDER`: enable string function declarations + definitions
-- `MEM_ARENA_GIMME_ALL`: define all of the above
+- `MEM_ARENA_GIMME_ALL`: include all function definitions
 - `MEM_ARENA_GIMME_ALL_DEC`: include all declarations; no definitions
-- `MEM_ARENA_IMPLEMENTATION_MAKE_STATIC`: `MEM_ARENA_IMPLEMENTATION` but make all functions static inline
+- `MEM_ARENA_IMPLEMENTATION_MAKE_STATIC`: same as `MEM_ARENA_IMPLEMENTATION` but all functions are static inline
 - `MEM_ARENA_GIMME_ALL_MAKE_STATIC`: same as `MEM_ARENA_GIMME_ALL` but all functions are static inline
 
 ### Optional Function Parameters
@@ -49,15 +49,10 @@ Not safe at all.
 ### Example Code
 
 ```C
-// exactly one file
 #define MEM_ARENA_GIMME_ALL
 #include "mem_arena.h"
 
-// everywhere else
-#define MEM_ARENA_GIMME_ALL_DEC
-#include "mem_arena.h"
-
-#include <stdio.h> /* mem_arena.h already includes it so technically redundant */
+#include <stdio.h>
 
 int main(void) {
   mem_arena *arena = arena_init(.name = "Main Arena"); /* Initialize arena */
