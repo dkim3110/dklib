@@ -117,8 +117,13 @@ struct mem_arena {
   size_t pos;                              // current pointer position
   size_t commit_pos;                       // current commit position
   void (*handle_oom)(mem_arena *, size_t); // function pointer to an oom error handler; ideally exits program
-  const char *name;                        // optionally give your arena a name; must outlive arena.
+  const char *name;                        // optionally give your arena a name; must outlive arena
 };
+
+typedef struct {
+  mem_arena *arena; // pointer to parent arena
+  size_t pos;       // position within parent arena
+} tmp_arena;
 
 typedef struct {
   uint8_t dummy;                            // dummy field for initialization
@@ -153,17 +158,21 @@ typedef struct {
 #define arena_realloc(arena, ptr, old_size, new_size, ...)                                                             \
   impl_arena__reallocation((arena), (impl_arena__alloc_params){.dummy = 0, __VA_ARGS__}, (ptr), (old_size), (new_size))
 
+#define arena_take_snapshot(arena)     ((tmp_arena){.arena = (arena), .pos = (arena)->pos})
+#define arena_drop_snapshot(tmp_arena) arena_rewind((tmp_arena).arena, (tmp_arena).pos)
+#define arena_get_pos(arena)           (arena)->pos
+
 MEM_ARENA_DEC void arena_oom_handler(mem_arena *, size_t);
 MEM_ARENA_DEC void arena_delete(mem_arena *);
 MEM_ARENA_DEC void arena_rewind(mem_arena *, size_t);
 MEM_ARENA_DEC void arena_clear(mem_arena *);
-MEM_ARENA_DEC void arena_reset(mem_arena *);
+MEM_ARENA_DEC void arena_purge(mem_arena *);
 
 MEM_ARENA_DEC mem_arena *impl_arena__initialization(impl_arena__init_params);
 MEM_ARENA_DEC void *impl_arena__allocation(mem_arena *, impl_arena__alloc_params, size_t, bool);
 MEM_ARENA_DEC void *impl_arena__callocation(mem_arena *, impl_arena__alloc_params, size_t, size_t);
 MEM_ARENA_DEC void *impl_arena__reallocation(mem_arena *, impl_arena__alloc_params, void *, size_t, size_t);
-MEM_ARENA_DEC void impl_arena__clearing(mem_arena *, bool);
+MEM_ARENA_DEC void impl_arena__resetting(mem_arena *, bool);
 MEM_ARENA_DEC uint32_t impl_arena__sys_get_pagesize(void);
 MEM_ARENA_DEC void *impl_arena__sys_mem_reserve(size_t);
 MEM_ARENA_DEC bool impl_arena__sys_mem_commit(void *, size_t);
@@ -203,12 +212,12 @@ MEM_ARENA_DEF void arena_rewind(mem_arena *arena, size_t pos) {
 } /* arena_rewind() */
 
 MEM_ARENA_DEF void arena_clear(mem_arena *arena) {
-  impl_arena__clearing(arena, false);
+  impl_arena__resetting(arena, false);
 } /* arena_clear() */
 
-MEM_ARENA_DEF void arena_reset(mem_arena *arena) {
-  impl_arena__clearing(arena, true);
-} /* arena_reset() */
+MEM_ARENA_DEF void arena_purge(mem_arena *arena) {
+  impl_arena__resetting(arena, true);
+} /* arena_purge() */
 
 MEM_ARENA_DEF mem_arena *impl_arena__initialization(impl_arena__init_params params) {
   if (!params.reserve_size) params.reserve_size = GiB(1);
@@ -307,7 +316,7 @@ MEM_ARENA_DEF void *impl_arena__reallocation(mem_arena *arena, impl_arena__alloc
   return new_ptr;
 } /* impl_arena__reallocation() */
 
-MEM_ARENA_DEF void impl_arena__clearing(mem_arena *arena, bool do_decommit) {
+MEM_ARENA_DEF void impl_arena__resetting(mem_arena *arena, bool do_decommit) {
   if (!arena) return;
 
   if (do_decommit) {
@@ -321,7 +330,7 @@ MEM_ARENA_DEF void impl_arena__clearing(mem_arena *arena, bool do_decommit) {
   }
 
   arena_rewind(arena, MEM_ARENA_BASE_POS);
-} /* impl_arena__clearing() */
+} /* impl_arena__resetting() */
 
 MEM_ARENA_DEF uint32_t impl_arena__sys_get_pagesize(void) {
 #ifdef MEM_ARENA_IS_LINUX
@@ -500,7 +509,7 @@ typedef union {
   ({                                                                                                                   \
   bool darr_reserve__success = false;                                                                                  \
   if (arr) {                                                                                                           \
-    void *darr_reserve__tmp = impl_darr__reserve((arena), (arr), sizeof(*(arr)), (size));                              \
+    void *darr_reserve__tmp = impl_darr__reservation((arena), (arr), sizeof(*(arr)), (size));                          \
     if (darr_reserve__tmp) {                                                                                           \
       (arr) = darr_reserve__tmp;                                                                                       \
       darr_reserve__success = true;                                                                                    \
@@ -511,7 +520,7 @@ typedef union {
 
 MEM_ARENA_DEC void *impl_darr__initialization(mem_arena *, size_t, size_t);
 MEM_ARENA_DEC void *impl_darr__growth(mem_arena *, void *, size_t);
-MEM_ARENA_DEC void *impl_darr__reserve(mem_arena *, void *, size_t, size_t);
+MEM_ARENA_DEC void *impl_darr__reservation(mem_arena *, void *, size_t, size_t);
 
 #endif // MEM_ARENA_DYNAMIC_ARRAY
 
@@ -701,7 +710,7 @@ MEM_ARENA_DEF bool impl_sb__concatenation(mem_arena *arena, strb *a, strb b) {
 
   if (requested_size > a_cap) {
     size_t new_cap = requested_size > a_cap * 2 ? requested_size : a_cap * 2;
-    char *tmp = impl_darr__reserve(arena, (*a), sizeof(char), new_cap);
+    char *tmp = impl_darr__reservation(arena, (*a), sizeof(char), new_cap);
     if (!tmp) {
       impl_sb__push_null(arena, a);
       return false;
@@ -852,7 +861,7 @@ MEM_ARENA_DEF void *impl_darr__growth(mem_arena *arena, void *arr, size_t elem_s
   return header + 1;
 } /* impl_darr__growth() */
 
-MEM_ARENA_DEF void *impl_darr__reserve(mem_arena *arena, void *arr, size_t elem_size, size_t size) {
+MEM_ARENA_DEF void *impl_darr__reservation(mem_arena *arena, void *arr, size_t elem_size, size_t size) {
   if (!size) return NULL;
   if (!arr) return NULL;
 
@@ -871,7 +880,7 @@ MEM_ARENA_DEF void *impl_darr__reserve(mem_arena *arena, void *arr, size_t elem_
   header->data.cap = size;
 
   return header + 1;
-} /* impl_darr__reserve() */
+} /* impl_darr__reservation() */
 
 #endif // MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION
 

@@ -59,7 +59,7 @@ int main(void) {
   if (!arena) return 1;
   
   strb text = build_strb(arena, "Hello, World"); /* Initialize string builder */
-  size_t pos = arena->pos;
+  size_t pos = arena_get_pos(arena);
   size_t *numbers = darr_init(arena, size_t, 10); /* Initialize dynamic array */
   
   for (size_t n = 0; n < 20; n++) {
