@@ -389,7 +389,10 @@ typedef struct {
   bool ignore_ord; // default: false
 } impl_sb__remove_params;
 
-#define sb_build(arena, str)         impl_sb__build((arena), (str), strlen(str))
+#define MEM_ARENA_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
+#define MEM_ARENA_STRLEN(str) (MEM_ARENA_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
+
+#define sb_build(arena, str)         impl_sb__build((arena), (str), MEM_ARENA_STRLEN(str))
 #define sb_strdup(arena, sb)         impl_sb__build((arena), (sb), sb_strlen(sb));
 #define sb_null_terminate(arena, sb) impl_sb__push_null((arena), &(sb))
 #define sb_tolower(sb)               impl_sb__letter_case_shift(&(sb), true)

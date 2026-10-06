@@ -29,7 +29,7 @@ This library does not concern itself with C++ support.
 Several function-like macros (`arena_init()`, `arena_alloc()`, `sb_remove()`, etc.) accept optional parameters. You can set custom values:
 
 ```C
-mem_arena *arena = arena_init(.reserve_size = MiB(500), .name = "Arena");
+char *buf = arena_alloc(arena, KiB(1), .align = 64);
 ```
 
 Consult the parameter structs in the header for a full list of defaults.
@@ -53,19 +53,18 @@ mem_arena *arena = arena_init(.oom_handler = custom_function);
 #include <stdio.h>
 
 int main(void) {
-  mem_arena *arena = arena_init(.name = "Main Arena"); /* Initialize arena */
+  mem_arena *arena = arena_init(.name = "Main Arena"); /* initialize arena */
   if (!arena) return 1;
   
-  strb text = sb_build(arena, "Hello, World"); /* Initialize string builder */
-  tmp_arena tmp = arena_take_snapshot(arena); /* Begin temporary arena */
-  size_t *numbers = darr_init(arena, size_t, 10); /* Initialize dynamic array */
+  strb text = sb_build(arena, "Hello, World"); /* initialize string builder */
+  tmp_arena tmp = arena_take_snapshot(arena); /* begin temporary arena */
   
+  size_t *numbers = darr_init(arena, size_t, 10); /* initialize dynamic array */
   for (size_t n = 0; n < 20; n++) {
     darr_push(arena, numbers, n); 
   }
   
   arena_drop_snapshot(tmp); /* end temporary arena */
-  
   sb_append(arena, text, '!');
   printf("%s\n", text);
     
