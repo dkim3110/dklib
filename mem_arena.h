@@ -144,7 +144,7 @@ typedef struct {
 #define MiB(n) ((size_t)(n) << 20)
 #define GiB(n) ((size_t)(n) << 30)
 
-#define arena_init(...) impl_arena__initialization((impl_arena__init_params){.dummy = 0, __VA_ARGS__})
+#define arena_init(...) impl_arena__initialization((impl_arena__init_params){.dummy = 0, ##__VA_ARGS__})
 
 #define arena_alloc(arena, size, ...)                                                                                  \
   impl_arena__allocation((arena), (impl_arena__alloc_params){.dummy = 0, ##__VA_ARGS__}, (size), false)
