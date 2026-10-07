@@ -1,4 +1,4 @@
-# `mem_arena.h` — Virtual Memory Arena Allocator
+# `dk_arena.h` — Virtual Memory Arena Allocator
 
 Header-only library à la [stb](https://github.com/nothings/stb) for a virtual memory [arena allocator](https://en.wikipedia.org/wiki/Region-based_memory_management) written in C.
 
@@ -12,24 +12,22 @@ This library does not concern itself with C++ support.
 
 ### Flags
 
-- `MEM_ARENA_IMPLEMENTATION`: enable function definitions
-- `MEM_ARENA_DYNAMIC_ARRAY`: enable dynamic array function declarations
-- `MEM_ARENA_DYNAMIC_ARRAY_IMPLEMENTATION`: enable dynamic array function definitions
-- `MEM_ARENA_GIMME_DYNAMIC_ARRAY`: enable dynamic array function declarations + definitions
-- `MEM_ARENA_STRING_BUILDER`: enable string function declarations
-- `MEM_ARENA_STRING_BUILDER_IMPLEMENTATION`: enable string function definitions
-- `MEM_ARENA_GIMME_STRING_BUILDER`: enable string function declarations + definitions
-- `MEM_ARENA_GIMME_ALL`: include all function definitions
-- `MEM_ARENA_GIMME_ALL_DEC`: include all declarations; no definitions
-- `MEM_ARENA_IMPLEMENTATION_MAKE_STATIC`: same as `MEM_ARENA_IMPLEMENTATION` but all functions are static inline
-- `MEM_ARENA_GIMME_ALL_MAKE_STATIC`: same as `MEM_ARENA_GIMME_ALL` but all functions are static inline
+- `DKA_IMPLEMENTATION`: enable function definitions
+- `DKA_DYNAMIC_ARRAY`: enable dynamic array function declarations
+- `DKA_DYNAMIC_ARRAY_IMPLEMENTATION`: enable dynamic array function definitions
+- `DKA_STRING_BUILDER`: enable string function declarations
+- `DKA_STRING_BUILDER_IMPLEMENTATION`: enable string function definitions
+- `DKA_GIMME_ALL`: include all function definitions
+- `DKA_GIMME_ALL_DEC`: include all declarations; no definitions
+- `DKA_IMPLEMENTATION_MAKE_STATIC`: same as `DKA_IMPLEMENTATION` but all functions are static inline
+- `DKA_GIMME_ALL_MAKE_STATIC`: same as `DKA_GIMME_ALL` but all functions are static inline
 
 ### Optional Function Parameters
 
-Several function-like macros (`arena_init()`, `arena_alloc()`, `sb_remove()`, etc.) accept optional parameters. You can set custom values:
+Several function-like macros (`dka_init()`, `dka_alloc()`, `sb_remove()`, etc.) accept optional parameters. You can set custom values:
 
 ```C
-char *buf = arena_alloc(arena, KiB(1), .align = 64);
+char *buf = dka_alloc(arena, KiB(1), .align = 64);
 ```
 
 Consult the parameter structs in the header for a full list of defaults.
@@ -41,34 +39,34 @@ This library provides a default oom handler that exits the program with an error
 *It is recommended that the custom oom handler exits the program.*
 
 ```C
-mem_arena *arena = arena_init(.oom_handler = custom_function);
+mem_arena *arena = dka_init(.oom_handler = custom_function);
 ```
 
 ### Example Code
 
 ```C
-#define MEM_ARENA_GIMME_ALL
+#define DKA_GIMME_ALL
 #include "mem_arena.h"
 
 #include <stdio.h>
 
 int main(void) {
-  mem_arena *arena = arena_init(.name = "Main Arena"); /* initialize arena */
+  mem_arena *arena = dka_init(.name = "Main Arena"); /* initialize arena */
   if (!arena) return 1;
   
   strb text = sb_build(arena, "Hello, World"); /* initialize string builder */
-  tmp_arena tmp = arena_take_snapshot(arena); /* begin temporary arena */
+  dka_temp tmp = dka_take_snapshot(arena); /* begin temporary arena */
   
   size_t *numbers = darr_init(arena, size_t, 10); /* initialize dynamic array */
   for (size_t n = 0; n < 20; n++) {
     darr_push(arena, numbers, n); 
   }
   
-  arena_drop_snapshot(tmp); /* end temporary arena */
+  dka_drop_snapshot(tmp); /* end temporary arena */
   sb_append(arena, text, '!');
   printf("%s\n", text);
     
-  arena_delete(arena); /* deallocate all at once */
+  dka_delete(arena); /* deallocate all at once */
   return 0;
 }
 ```
