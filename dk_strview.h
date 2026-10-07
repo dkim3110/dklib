@@ -66,10 +66,10 @@ typedef struct {
   #define sb_to_sv(sb) to_strv_wlen((sb), strb_strlen(sb))
 #endif // DKA_STRING_BUILDER
 
-DKSV_DEC bool strv_empty(strv sv);
-DKSV_DEC bool strv_blank(strv sv);
-DKSV_DEC bool strv_eq(strv a, strv b);
-DKSV_DEC bool strv_ic_eq(strv a, strv b);
+DKSV_DEC bool strv_isempty(strv sv);
+DKSV_DEC bool strv_isblank(strv sv);
+DKSV_DEC bool strv_equals(strv a, strv b);
+DKSV_DEC bool strv_ic_equals(strv a, strv b);
 DKSV_DEC int strv_cmp(strv a, strv b);
 DKSV_DEC bool strv_isalpha(strv sv);
 DKSV_DEC bool strv_isalnum(strv sv);
@@ -120,51 +120,51 @@ DKSV_DEC uint32_t strv_hash(strv sv);
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_empty(strv sv) {
+DKSV_DEF bool strv_isempty(strv sv) {
   return ((sv.len == 0) || (!sv.data));
-} /* strv_empty() */
+} /* strv_isempty() */
 
 /*
  * Function to verify if a given strv struct is blank: either emoty or consisting of only whitespaces.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_blank(strv sv) {
-  if (strv_empty(sv)) return true;
+DKSV_DEF bool strv_isblank(strv sv) {
+  if (strv_isempty(sv)) return true;
 
   for (size_t n = 0; n < sv.len; n++) {
     if (!isspace((unsigned char)sv.data[n])) return false;
   }
 
   return true;
-} /* strv_blank() */
+} /* strv_isblank() */
 
 /*
  * Function to verify if two strv structs are equal.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_eq(strv a, strv b) {
+DKSV_DEF bool strv_equals(strv a, strv b) {
   if (a.len != b.len) return false;
-  if (strv_empty(a) || strv_empty(b)) return (strv_empty(a) == strv_empty(b));
+  if (strv_isempty(a) || strv_isempty(b)) return (strv_isempty(a) == strv_isempty(b));
   return (memcmp(a.data, b.data, a.len) == 0);
-} /* strv_eq() */
+} /* strv_equals() */
 
 /*
  * Function to verify if two strv structs are equal, ignoring letter case.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_ic_eq(strv a, strv b) {
+DKSV_DEF bool strv_ic_equals(strv a, strv b) {
   if (a.len != b.len) return false;
-  if (strv_empty(a) || strv_empty(b)) return (strv_empty(a) == strv_empty(b));
+  if (strv_isempty(a) || strv_isempty(b)) return (strv_isempty(a) == strv_isempty(b));
 
   for (size_t n = 0; n < a.len; n++) {
     if (toupper((unsigned char)a.data[n]) != toupper((unsigned char)b.data[n])) return false;
   }
 
   return true;
-} /* strv_ic_eq() */
+} /* strv_ic_equals() */
 
 /*
  * Function to compare two strings.
@@ -187,7 +187,7 @@ DKSV_DEF int strv_cmp(strv a, strv b) {
  */
 
 DKSV_DEF bool strv_isalpha(strv sv) {
-  if (strv_empty(sv)) return false;
+  if (strv_isempty(sv)) return false;
 
   for (size_t n = 0; n < sv.len; n++) {
     if (!isalpha((unsigned char)sv.data[n])) return false;
@@ -203,7 +203,7 @@ DKSV_DEF bool strv_isalpha(strv sv) {
  */
 
 DKSV_DEF bool strv_isalnum(strv sv) {
-  if (strv_empty(sv)) return false;
+  if (strv_isempty(sv)) return false;
 
   for (size_t n = 0; n < sv.len; n++) {
     if (!isalnum((unsigned char)sv.data[n])) return false;
@@ -218,7 +218,7 @@ DKSV_DEF bool strv_isalnum(strv sv) {
  */
 
 DKSV_DEF bool strv_isdigit(strv sv) {
-  if (strv_empty(sv)) return false;
+  if (strv_isempty(sv)) return false;
 
   for (size_t n = 0; n < sv.len; n++) {
     if (!isdigit((unsigned char)sv.data[n])) return false;
@@ -232,7 +232,7 @@ DKSV_DEF bool strv_isdigit(strv sv) {
  */
 
 DKSV_DEF void fput_strv(strv sv, FILE *stream) {
-  if ((!stream) || (strv_empty(sv))) return;
+  if ((!stream) || (strv_isempty(sv))) return;
   fwrite(sv.data, sizeof(char), sv.len, stream);
 } /* fput_strv() */
 
@@ -260,7 +260,7 @@ DKSV_DEF void println_strv(strv sv) {
  */
 
 DKSV_DEF strv strv_take(strv sv, size_t n) {
-  if (strv_empty(sv)) return sv;
+  if (strv_isempty(sv)) return sv;
   if (n > sv.len) n = sv.len;
 
   return (strv){.data = sv.data, .len = n};
@@ -273,7 +273,7 @@ DKSV_DEF strv strv_take(strv sv, size_t n) {
  */
 
 DKSV_DEF strv strv_drop(strv sv, size_t n) {
-  if (strv_empty(sv)) return sv;
+  if (strv_isempty(sv)) return sv;
   if (n > sv.len) n = sv.len;
 
   return (strv){.data = sv.data + n, .len = sv.len - n};
@@ -296,7 +296,7 @@ DKSV_DEF strv strv_sub(strv sv, size_t start, size_t end) {
  */
 
 DKSV_DEF strv strv_split(strv *sv, char delimiter) {
-  if (strv_empty(*sv)) return *sv;
+  if (strv_isempty(*sv)) return *sv;
 
   const char *found = (const char *)memchr(sv->data, delimiter, sv->len);
   size_t n = (found) ? (size_t)(found - sv->data) : sv->len;
@@ -316,7 +316,7 @@ DKSV_DEF strv strv_split(strv *sv, char delimiter) {
  */
 
 DKSV_DEF strv strv_split_ws(strv *sv) {
-  if (strv_empty(*sv)) return *sv;
+  if (strv_isempty(*sv)) return *sv;
 
   size_t n = 0;
   while ((n < sv->len) && (!isspace(sv->data[n]))) n++;
@@ -344,7 +344,7 @@ DKSV_DEF strv strv_trim(strv sv) {
  */
 
 DKSV_DEF strv strv_ltrim(strv sv) {
-  if (strv_empty(sv)) return sv;
+  if (strv_isempty(sv)) return sv;
   while ((sv.len > 0) && (isspace((unsigned char)sv.data[0]))) sv = strv_drop(sv, 1);
 
   return sv;
@@ -356,7 +356,7 @@ DKSV_DEF strv strv_ltrim(strv sv) {
  */
 
 DKSV_DEF strv strv_rtrim(strv sv) {
-  if (strv_empty(sv)) return sv;
+  if (strv_isempty(sv)) return sv;
   while ((sv.len > 0) && (isspace((unsigned char)sv.data[sv.len - 1]))) sv = strv_take(sv, sv.len - 1);
 
   return sv;
@@ -378,7 +378,7 @@ DKSV_DEF strv strv_trimc(strv sv, char c) {
  */
 
 DKSV_DEF strv strv_ltrimc(strv sv, char c) {
-  if (strv_empty(sv)) return sv;
+  if (strv_isempty(sv)) return sv;
   while ((sv.len > 0) && (sv.data[0] == c)) sv = strv_drop(sv, 1);
 
   return sv;
@@ -390,7 +390,7 @@ DKSV_DEF strv strv_ltrimc(strv sv, char c) {
  */
 
 DKSV_DEF strv strv_rtrimc(strv sv, char c) {
-  if (strv_empty(sv)) return sv;
+  if (strv_isempty(sv)) return sv;
   while ((sv.len > 0) && (sv.data[sv.len - 1] == c)) sv = strv_take(sv, sv.len - 1);
 
   return sv;
@@ -403,9 +403,9 @@ DKSV_DEF strv strv_rtrimc(strv sv, char c) {
  */
 
 DKSV_DEF bool strv_prefix(strv base, strv prefix) {
-  if (strv_empty(prefix)) return true;
+  if (strv_isempty(prefix)) return true;
   if ((!base.data) || (!prefix.data)) return false;
-  if ((prefix.len > base.len) || (strv_empty(base))) return false;
+  if ((prefix.len > base.len) || (strv_isempty(base))) return false;
   return (memcmp(base.data, prefix.data, prefix.len) == 0);
 } /* strv_prefix() */
 
@@ -416,9 +416,9 @@ DKSV_DEF bool strv_prefix(strv base, strv prefix) {
  */
 
 DKSV_DEF bool strv_suffix(strv base, strv suffix) {
-  if (strv_empty(suffix)) return true;
+  if (strv_isempty(suffix)) return true;
   if ((!base.data) || (!suffix.data)) return false;
-  if ((suffix.len > base.len) || (strv_empty(base))) return false;
+  if ((suffix.len > base.len) || (strv_isempty(base))) return false;
   return (memcmp(base.data + (base.len - suffix.len), suffix.data, suffix.len) == 0);
 } /* strv_suffix() */
 
@@ -429,10 +429,10 @@ DKSV_DEF bool strv_suffix(strv base, strv suffix) {
  */
 
 DKSV_DEF bool strv_ic_prefix(strv base, strv prefix) {
-  if (strv_empty(prefix)) return true;
+  if (strv_isempty(prefix)) return true;
   if ((!base.data) || (!prefix.data)) return false;
-  if ((prefix.len > base.len) || (strv_empty(base))) return false;
-  return strv_ic_eq(strv_take(base, prefix.len), prefix);
+  if ((prefix.len > base.len) || (strv_isempty(base))) return false;
+  return strv_ic_equals(strv_take(base, prefix.len), prefix);
 } /* strv_ic_prefix() */
 
 /*
@@ -442,10 +442,10 @@ DKSV_DEF bool strv_ic_prefix(strv base, strv prefix) {
  */
 
 DKSV_DEF bool strv_ic_suffix(strv base, strv suffix) {
-  if (strv_empty(suffix)) return true;
+  if (strv_isempty(suffix)) return true;
   if ((!base.data) || (!suffix.data)) return false;
-  if ((suffix.len > base.len) || (strv_empty(base))) return false;
-  return strv_ic_eq(strv_drop(base, base.len - suffix.len), suffix);
+  if ((suffix.len > base.len) || (strv_isempty(base))) return false;
+  return strv_ic_equals(strv_drop(base, base.len - suffix.len), suffix);
 } /* strv_ic_suffix() */
 
 /*
@@ -465,8 +465,8 @@ DKSV_DEF bool strv_contains(strv base, strv item) {
  */
 
 DKSV_DEF int64_t idx_strv_contains(strv base, strv item) {
-  if (strv_empty(item)) return 0;
-  if ((item.len > base.len) || (strv_empty(base))) return -1;
+  if (strv_isempty(item)) return 0;
+  if ((item.len > base.len) || (strv_isempty(base))) return -1;
 
   char *sub = memmem(base.data, base.len, item.data, item.len);
   return (sub) ? sub - base.data : -1;
@@ -479,7 +479,7 @@ DKSV_DEF int64_t idx_strv_contains(strv base, strv item) {
  */
 
 DKSV_DEF int64_t strv_idx(strv sv, char c) {
-  if (strv_empty(sv)) return -1;
+  if (strv_isempty(sv)) return -1;
   const char *found = (const char *)memchr(sv.data, c, sv.len);
   return (found) ? found - sv.data : -1;
 } /* strv_idx() */
@@ -491,7 +491,7 @@ DKSV_DEF int64_t strv_idx(strv sv, char c) {
  */
 
 DKSV_DEF int64_t strv_idx_last(strv sv, char c) {
-  if (strv_empty(sv)) return -1;
+  if (strv_isempty(sv)) return -1;
   const char *found = (const char *)memrchr(sv.data, c, sv.len);
   return (found) ? found - sv.data : -1;
 } /* strv_idx_last() */
@@ -502,7 +502,7 @@ DKSV_DEF int64_t strv_idx_last(strv sv, char c) {
  */
 
 DKSV_DEF int32_t strv_char_at(strv sv, size_t index) {
-  if ((index >= sv.len) || (strv_empty(sv))) return -1;
+  if ((index >= sv.len) || (strv_isempty(sv))) return -1;
   return (unsigned char)sv.data[index];
 } /* strv_char_at() */
 
@@ -512,7 +512,7 @@ DKSV_DEF int32_t strv_char_at(strv sv, size_t index) {
  */
 
 DKSV_DEF size_t strv_count_char(strv sv, char c) {
-  if (strv_empty(sv)) return 0;
+  if (strv_isempty(sv)) return 0;
   size_t count = 0;
 
   for (size_t n = 0; n < sv.len; n++) {
@@ -538,11 +538,11 @@ DKSV_DEF strv to_strv_wlen(const char *cstring, size_t len) {
 
 DKSV_DEF double strv_to_dbl(strv sv) {
   sv = strv_trim(sv);
-  if (strv_empty(sv)) return NAN;
+  if (strv_isempty(sv)) return NAN;
 
-  if (strv_ic_eq(sv, to_strv("nan"))) return NAN;
-  if ((strv_ic_eq(sv, to_strv("inf"))) || (strv_ic_eq(sv, to_strv("+inf")))) return INFINITY;
-  if (strv_ic_eq(sv, to_strv("-inf"))) return -INFINITY;
+  if (strv_ic_equals(sv, to_strv("nan"))) return NAN;
+  if ((strv_ic_equals(sv, to_strv("inf"))) || (strv_ic_equals(sv, to_strv("+inf")))) return INFINITY;
+  if (strv_ic_equals(sv, to_strv("-inf"))) return -INFINITY;
 
   size_t index = 0;
   int sign = 1;
