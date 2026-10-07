@@ -7,7 +7,8 @@ Macros that enable function definitions (excluding the MAKE_STATIC macros) must 
 before including the header. See
 https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt for more information.
 
-This library requires GCC or Clang with GNU C extensions, so compile with `-std=gnu11`.
+This library requires GCC or Clang with GNU C extensions, so compile with `-std=gnu11`. Additionally, this library
+includes `<math.h>`, so compile with `-lm` as well.
 
 This library does not concern itself with C++ support.
 
@@ -602,4 +603,47 @@ DKSV_DEF double strv_to_dbl(strv sv) {
 
   return (index < sv.len) ? NAN : result * sign;
 } /* strv_to_dbl() */
+
+/*
+ * Function to hash a strv struct using MurmurHash3.
+ * Accepts a strv struct and returns a non-cryptographic hash value.
+ * Initial seed is set to 0.
+ */
+
+DKSV_DEF uint32_t strv_hash(strv sv) {
+  uint32_t hash = 0;
+  uint32_t k;
+  for (size_t n = sv.len >> 2; n; n--) {
+    memcpy(&k, sv.data, sizeof(uint32_t));
+    sv.data += sizeof(uint32_t);
+
+    k *= 0xcc9e2d51;
+    k = (k << 15) | (k >> 17);
+    k *= 0x1b873593;
+
+    hash ^= k;
+    hash = (hash << 13) | (hash >> 19);
+    hash = hash * 5 + 0xe6546b64;
+  }
+
+  k = 0;
+  for (size_t n = sv.len & 3; n; n--) {
+    k <<= 8;
+    k |= (unsigned char)sv.data[n - 1];
+  }
+
+  k *= 0xcc9e2d51;
+  k = (k << 15) | (k >> 17);
+  k *= 0x1b873593;
+
+  hash ^= k;
+  hash ^= sv.len;
+  hash ^= hash >> 16;
+  hash *= 0x85ebca6b;
+  hash ^= hash >> 13;
+  hash *= 0xc2b2ae35;
+  hash ^= hash >> 16;
+  return hash;
+} /* strv_hash() */
+
 #endif // DKSV_IMPLEMENTATION
