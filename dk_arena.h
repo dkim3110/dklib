@@ -1,26 +1,74 @@
-// dk_arena.h - public domain - Daniel Inhoi Kim, 2026
+// `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
 // Header-only library for virtual memory arenas.
 // See end of file for license information.
 
 /*
-Macros that enable function definitions (excluding the MAKE_STATIC macros) must only be defined once in one
-source file before including the header. See
-https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt
-for more information.
- */
+## Usage
+Macros that enable function definitions (excluding the MAKE_STATIC macros) must only be defined once in one source file
+before including the header. See
+https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt for more information.
 
-/*
+This library requires GCC or Clang with GNU C extensions, so compile with `-std=gnu11`. It targets Linux and Windows
+only. Windows support is written against the Win32 API but untested.
+
+This library does not concern itself with C++ support.
+
 ### Flags
+- DKA_IMPLEMENTATION: enable function definitions
+- DKA_DYNAMIC_ARRAY: enable dynamic array function declarations
+- DKA_DYNAMIC_ARRAY_IMPLEMENTATION: enable dynamic array function definitions
+- DKA_STRING_BUILDER: enable string function declarations
+- DKA_STRING_BUILDER_IMPLEMENTATION: enable string function definitions
+- DKA_GIMME_ALL: include all function definitions
+- DKA_GIMME_ALL_DEC: include all declarations; no definitions
+- DKA_IMPLEMENTATION_MAKE_STATIC: same as `DKA_IMPLEMENTATION` but all functions are static inline
+- DKA_GIMME_ALL_MAKE_STATIC: same as `DKA_GIMME_ALL` but all functions are static inline
 
-- `DKA_IMPLEMENTATION`: enable function definitions
-- `DKA_DYNAMIC_ARRAY`: enable dynamic array function declarations
-- `DKA_DYNAMIC_ARRAY_IMPLEMENTATION`: enable dynamic array function definitions
-- `DKA_STRING_BUILDER`: enable string function declarations
-- `DKA_STRING_BUILDER_IMPLEMENTATION`: enable string function definitions
-- `DKA_GIMME_ALL`: include all function definitions
-- `DKA_GIMME_ALL_DEC`: include all declarations; no definitions
-- `DKA_IMPLEMENTATION_MAKE_STATIC`: same as `DKA_IMPLEMENTATION` but all functions are static inline
-- `DKA_GIMME_ALL_MAKE_STATIC`: same as `DKA_GIMME_ALL` but all functions are static inline
+### Optional Function Parameters
+Several function-like macros (`dka_init()`, `dka_alloc()`, `sb_remove()`, etc.) accept optional parameters. You can set
+custom values:
+
+  ```C
+  char *buf = dka_alloc(arena, KiB(1), .align = 64);
+  ```
+
+Consult the parameter structs for a full list of defaults.
+
+### OOM Handler Function
+This library provides a default oom handler that exits the program with an error code. You can use your own handler if
+you so choose. The oom handler should ideally exit the program.
+
+  ```C
+  mem_arena *arena = dka_init(.oom_handler = custom_function);
+  ```
+
+### Example Code
+  ```C
+  #define DKA_GIMME_ALL
+  #include "mem_arena.h"
+
+  #include <stdio.h>
+
+  int main(void) {
+    mem_arena *arena = dka_init(.name = "Main Arena"); // initialize arena
+    if (!arena) return 1;
+
+    strb text = sb_build(arena, "Hello, World"); // initialize string builder
+    dka_temp tmp = dka_take_snapshot(arena); // begin temporary arena
+
+    size_t *numbers = darr_init(arena, size_t, 10); // initialize dynamic array
+    for (size_t n = 0; n < 20; n++) {
+      darr_push(arena, numbers, n);
+    }
+
+    dka_drop_snapshot(tmp); // end temporary arena
+    sb_append(arena, text, '!');
+    printf("%s\n", text);
+
+    dka_delete(arena); // deallocate all at once
+    return 0;
+  }
+  ```
  */
 
 #ifdef DKA_GIMME_ALL_MAKE_STATIC
