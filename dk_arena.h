@@ -430,9 +430,6 @@ typedef struct {
 #define strb_concat(arena, sb1, sb2)   impl_strb__concatenation((arena), &(sb1), (sb2))
 #define strb_remove(sb, n, ...)        impl_strb__removal(&(sb), (n), (strb__params){.dummy = 0, ##__VA_ARGS__})
 #define strb_reverse(sb)               impl_strb__reversal(&(sb))
-#define strb_ltrim(sb)                 impl_strb__trim(&(sb), true)
-#define strb_rtrim(sb)                 impl_strb__trim(&(sb), false)
-#define strb_trim(sb)                  impl_strb__trim_both(&(sb))
 
 DKA_DEC size_t strb_strlen(strb);
 DKA_DEC bool strb_isempty(strb);
@@ -450,8 +447,6 @@ DKA_DEC bool impl_strb__insertion(dk_arena *, strb *, char, size_t);
 DKA_DEC bool impl_strb__concatenation(dk_arena *, strb *, strb);
 DKA_DEC bool impl_strb__removal(strb *, size_t, strb__params);
 DKA_DEC bool impl_strb__reversal(strb *);
-DKA_DEC bool impl_strb__trim(strb *, bool);
-DKA_DEC bool impl_strb__trim_both(strb *);
 
 #endif // DKA_STRING_BUILDER
 
@@ -762,49 +757,6 @@ DKA_DEF bool impl_strb__reversal(strb *sb) {
 
   return true;
 } /* impl_strb__reversal() */
-
-DKA_DEF bool impl_strb__trim(strb *sb, bool trim_left) {
-  if (!sb) return false;
-  if (strb_isempty(*sb)) return true;
-
-  size_t len = strb_strlen(*sb);
-  if (len == 1) {
-    if (isspace((unsigned char)(*sb)[0])) {
-      darr_pop(*sb);
-      ((darr_header *)(*sb) - 1)->data.count = 1;
-      (*sb)[0] = '\0';
-      return true;
-    }
-  } else if (strb_isblank(*sb)) {
-    ((darr_header *)(*sb) - 1)->data.count = 1;
-    (*sb)[0] = '\0';
-    return true;
-  }
-
-  if (trim_left) {
-    size_t whitespace_count = 0;
-    impl_strb__pop_null(sb);
-    for (size_t n = 0; n < len; n++) {
-      if (!isspace((unsigned char)(*sb)[n])) break;
-      whitespace_count++;
-    }
-
-    memmove((*sb), (*sb) + whitespace_count, len - whitespace_count);
-    (*sb)[len - whitespace_count] = '\0';
-    ((darr_header *)(*sb) - 1)->data.count = len - whitespace_count + 1;
-  } else {
-    impl_strb__pop_null(sb);
-    while ((len > 0) && (isspace((unsigned char)(*sb)[--len]))) darr_pop(*sb);
-    (*sb)[++len] = '\0';
-    ((darr_header *)(*sb) - 1)->data.count++;
-  }
-
-  return true;
-} /* impl_strb__trim() */
-
-DKA_DEF bool impl_strb__trim_both(strb *sb) {
-  return (impl_strb__trim(sb, true) && impl_strb__trim(sb, false));
-} /* impl_strb__trim_both() */
 
 #endif // DKA_STRING_BUILDER_IMPLEMENTATION
 
