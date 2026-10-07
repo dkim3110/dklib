@@ -1,6 +1,6 @@
-# dklib
+# `dklib`
 
-Header-only libraries à la [stb](https://github.com/nothings/stb) written in C.
+Collection of header-only libraries à la [stb](https://github.com/nothings/stb) written in C, mainly for personal use.
 
 ---
 
