@@ -9,7 +9,7 @@ Libraries
 
 ## Usage
 
-To use one of these libraries, you should include it in one of your source files and define its implementation macro:
+To use one of these libraries, you should define its implementation macro and include it in one of your source files:
 
 ```c
 #define DK_*_IMPLEMENTATION
