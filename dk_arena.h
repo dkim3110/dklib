@@ -1,8 +1,7 @@
-// `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
-// Header-only library for virtual memory arenas.
-// See end of file for license information.
-
 /*
+# `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
+Header-only library for virtual memory arenas. See end of file for license information.
+
 ## Usage
 Macros that enable function definitions (excluding the MAKE_STATIC macros) must only be defined once in one source file
 before including the header. See
