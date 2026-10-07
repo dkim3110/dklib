@@ -43,7 +43,7 @@ for more information.
 
 #ifdef MEM_ARENA_IMPLEMENTATION_MAKE_STATIC
   #define MEM_ARENA_DEF static inline
-  #define MEM_ARENA_DEC static inline
+  #define MEM_ARENA_DEC MEM_ARENA_DEF
 
   #define MEM_ARENA_IMPLEMENTATION
 
