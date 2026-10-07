@@ -1,3 +1,5 @@
+#define DKA_GIMME_ALL
+
 /*
 # `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for virtual memory arenas. See end of file for license information.
@@ -420,20 +422,19 @@ typedef struct {
 #define DKA_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
 #define DKA_STRLEN(str) (DKA_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
 
-#define strb_build(arena, str)         impl_strb__build((arena), (str), DKA_STRLEN(str))
-#define strb_strdup(arena, sb)         impl_strb__build((arena), (sb), strb_strlen(sb));
-#define strb_null_terminate(arena, sb) impl_strb__push_null((arena), &(sb))
-#define strb_tolower(sb)               impl_strb__letter_case_shift(&(sb), true)
-#define strb_toupper(sb)               impl_strb__letter_case_shift(&(sb), false)
-#define strb_insert(arena, sb, c, n)   impl_strb__insertion((arena), &(sb), (c), (n))
-#define strb_append(arena, sb, c)      impl_strb__insertion((arena), &(sb), (c), strb_strlen(sb))
-#define strb_concat(arena, sb1, sb2)   impl_strb__concatenation((arena), &(sb1), (sb2))
-#define strb_remove(sb, n, ...)        impl_strb__removal(&(sb), (n), (strb__params){.dummy = 0, ##__VA_ARGS__})
-#define strb_reverse(sb)               impl_strb__reversal(&(sb))
+#define strb_build(arena, str)           impl_strb__build((arena), (str), DKA_STRLEN(str))
+#define strb_strdup(arena, sb)           impl_strb__build((arena), (sb), strb_strlen(sb));
+#define strb_null_terminate(arena, sb)   impl_strb__push_null((arena), &(sb))
+#define strb_tolower(sb)                 impl_strb__letter_case_shift(&(sb), true)
+#define strb_toupper(sb)                 impl_strb__letter_case_shift(&(sb), false)
+#define strb_insert(arena, sb, c, n)     impl_strb__insertion((arena), &(sb), (c), (n))
+#define strb_append(arena, sb, c)        impl_strb__insertion((arena), &(sb), (c), strb_strlen(sb))
+#define strb_concat(arena, sb, str, len) impl_strb__concatenation((arena), &(sb), (str), (len))
+#define strb_remove(sb, n, ...)          impl_strb__removal(&(sb), (n), (strb__params){.dummy = 0, ##__VA_ARGS__})
+#define strb_reverse(sb)                 impl_strb__reversal(&(sb))
 
 DKA_DEC size_t strb_strlen(strb);
 DKA_DEC bool strb_isempty(strb);
-DKA_DEC bool strb_isblank(strb);
 DKA_DEC bool strb_equals(strb, strb);
 DKA_DEC bool strb_equals_ic(strb, strb);
 DKA_DEC int strb_compare(strb, strb);
@@ -442,9 +443,8 @@ DKA_DEC strb impl_strb__build(dk_arena *, const char *, size_t len);
 DKA_DEC bool impl_strb__push_null(dk_arena *, strb *);
 DKA_DEC bool impl_strb__pop_null(strb *);
 DKA_DEC bool impl_strb__letter_case_shift(strb *, bool);
-
 DKA_DEC bool impl_strb__insertion(dk_arena *, strb *, char, size_t);
-DKA_DEC bool impl_strb__concatenation(dk_arena *, strb *, strb);
+DKA_DEC bool impl_strb__concatenation(dk_arena *, strb *, char *, size_t);
 DKA_DEC bool impl_strb__removal(strb *, size_t, strb__params);
 DKA_DEC bool impl_strb__reversal(strb *);
 
@@ -563,16 +563,6 @@ DKA_DEF bool strb_isempty(strb sb) {
   return ((!sb) || (strb_strlen(sb) == 0));
 } /* strb_isempty() */
 
-DKA_DEF bool strb_isblank(strb sb) {
-  if (strb_isempty(sb)) return true;
-
-  for (size_t n = 0; n < strb_strlen(sb); n++) {
-    if (!isspace((unsigned char)sb[n])) return false;
-  }
-
-  return true;
-} /* strb_isblank() */
-
 DKA_DEF bool strb_equals(strb a, strb b) {
   size_t a_len = strb_strlen(a);
   size_t b_len = strb_strlen(b);
@@ -616,7 +606,7 @@ DKA_DEF strb impl_strb__build(dk_arena *arena, const char *str, size_t len) {
 
   memcpy(sb, str, len + 1);
   ((darr_header *)sb - 1)->data.count = len + 1;
-  impl_strb__push_null(arena, sb);
+  impl_strb__push_null(arena, &sb);
   return sb;
 } /* impl_strb__build() */
 
@@ -683,13 +673,12 @@ DKA_DEF bool impl_strb__insertion(dk_arena *arena, strb *sb, char c, size_t n) {
   return impl_strb__push_null(arena, sb);
 } /* impl_strb__insertion() */
 
-DKA_DEF bool impl_strb__concatenation(dk_arena *arena, strb *a, strb b) {
+DKA_DEF bool impl_strb__concatenation(dk_arena *arena, strb *a, char *b, size_t b_len) {
   if ((!a) || (!b)) return false;
   if (!(*a)) return false;
   if (strb_isempty(b)) return true;
 
   size_t a_len = strb_strlen(*a);
-  size_t b_len = strb_strlen(b);
 
   if (SIZE_MAX - a_len - 1 < b_len) return false;
 
