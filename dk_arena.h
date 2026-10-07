@@ -24,8 +24,8 @@ This library does not concern itself with C++ support.
 - DKA_GIMME_ALL_MAKE_STATIC: same as `DKA_GIMME_ALL` but all functions are static inline
 
 ### Optional Function Parameters
-Several function-like macros (`dka_init()`, `dka_alloc()`, `sb_remove()`, etc.) accept optional parameters. You can set
-custom values:
+Several function-like macros (`dka_init()`, `dka_alloc()`, `strb_remove()`, etc.) accept optional parameters. You can
+set custom values:
 
   ```C
   char *buf = dka_alloc(arena, KiB(1), .align = 64);
@@ -38,21 +38,21 @@ This library provides a default oom handler that exits the program with an error
 you so choose. The oom handler should ideally exit the program.
 
   ```C
-  mem_arena *arena = dka_init(.oom_handler = custom_function);
+  dk_arena *arena = dka_init(.oom_handler = custom_function);
   ```
 
 ### Example Code
   ```C
   #define DKA_GIMME_ALL
-  #include "mem_arena.h"
+  #include "dk_arena.h"
 
   #include <stdio.h>
 
   int main(void) {
-    mem_arena *arena = dka_init(.name = "Main Arena"); // initialize arena
+    dk_arena *arena = dka_init(.name = "Main Arena"); // initialize arena
     if (!arena) return 1;
 
-    strb text = sb_build(arena, "Hello, World"); // initialize string builder
+    strb text = strb_build(arena, "Hello, World"); // initialize string builder
     dka_temp tmp = dka_take_snapshot(arena); // begin temporary arena
 
     size_t *numbers = darr_init(arena, size_t, 10); // initialize dynamic array
@@ -61,7 +61,7 @@ you so choose. The oom handler should ideally exit the program.
     }
 
     dka_drop_snapshot(tmp); // end temporary arena
-    sb_append(arena, text, '!');
+    strb_append(arena, text, '!');
     printf("%s\n", text);
 
     dka_delete(arena); // deallocate all at once
@@ -87,8 +87,8 @@ you so choose. The oom handler should ideally exit the program.
 #endif // DKA_GIMME_ALL_DEC
 
 #ifdef DKA_IMPLEMENTATION_MAKE_STATIC
-  #define DKA_DEF static inline
-  #define DKA_DEC DKA_DEF
+  #define DKA_DEC static inline
+  #define DKA_DEF DKA_DEC
 
   #define DKA_IMPLEMENTATION
 
@@ -100,8 +100,8 @@ you so choose. The oom handler should ideally exit the program.
     #define DKA_STRING_BUILDER_IMPLEMENTATION
   #endif // DKA_STRING_BUILDER
 #else
-  #define DKA_DEF
   #define DKA_DEC extern
+  #define DKA_DEF
 #endif // DKA_IMPLEMENTATION_MAKE_STATIC
 
 #ifdef DKA_STRING_BUILDER_IMPLEMENTATION
@@ -415,44 +415,43 @@ typedef char *strb; // string builder
 typedef struct {
   uint8_t dummy;   // dummy field for initialization
   bool ignore_ord; // default: false
-} sb__params;
+} strb__params;
 
 #define DKA_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
 #define DKA_STRLEN(str) (DKA_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
 
-#define sb_build(arena, str)         impl_sb__build((arena), (str), DKA_STRLEN(str))
-#define sb_strdup(arena, sb)         impl_sb__build((arena), (sb), sb_strlen(sb));
-#define sb_null_terminate(arena, sb) impl_sb__push_null((arena), &(sb))
-#define sb_tolower(sb)               impl_sb__letter_case_shift(&(sb), true)
-#define sb_toupper(sb)               impl_sb__letter_case_shift(&(sb), false)
-#define sb_insert(arena, sb, c, n)   impl_sb__insertion((arena), &(sb), (c), (n))
-#define sb_append(arena, sb, c)      impl_sb__insertion((arena), &(sb), (c), sb_strlen(sb))
-#define sb_concat(arena, sb1, sb2)   impl_sb__concatenation((arena), &(sb1), (sb2))
-#define sb_remove(sb, n, ...)        impl_sb__removal(&(sb), (n), (sb__params){.dummy = 0, ##__VA_ARGS__})
-#define sb_reverse(sb)               impl_sb__reversal(&(sb))
-#define sb_ltrim(sb)                 impl_sb__trim(&(sb), true)
-#define sb_rtrim(sb)                 impl_sb__trim(&(sb), false)
-#define sb_trim(sb)                  impl_sb__trim_both(&(sb))
+#define strb_build(arena, str)         impl_strb__build((arena), (str), DKA_STRLEN(str))
+#define strb_strdup(arena, sb)         impl_strb__build((arena), (sb), strb_strlen(sb));
+#define strb_null_terminate(arena, sb) impl_strb__push_null((arena), &(sb))
+#define strb_tolower(sb)               impl_strb__letter_case_shift(&(sb), true)
+#define strb_toupper(sb)               impl_strb__letter_case_shift(&(sb), false)
+#define strb_insert(arena, sb, c, n)   impl_strb__insertion((arena), &(sb), (c), (n))
+#define strb_append(arena, sb, c)      impl_strb__insertion((arena), &(sb), (c), strb_strlen(sb))
+#define strb_concat(arena, sb1, sb2)   impl_strb__concatenation((arena), &(sb1), (sb2))
+#define strb_remove(sb, n, ...)        impl_strb__removal(&(sb), (n), (strb__params){.dummy = 0, ##__VA_ARGS__})
+#define strb_reverse(sb)               impl_strb__reversal(&(sb))
+#define strb_ltrim(sb)                 impl_strb__trim(&(sb), true)
+#define strb_rtrim(sb)                 impl_strb__trim(&(sb), false)
+#define strb_trim(sb)                  impl_strb__trim_both(&(sb))
 
-DKA_DEC size_t sb_strlen(strb);
-DKA_DEC bool sb_isempty(strb);
-DKA_DEC bool sb_isblank(strb);
-DKA_DEC bool sb_equals(strb, strb);
-DKA_DEC bool sb_equals_ic(strb, strb);
-DKA_DEC int sb_compare(strb, strb);
-DKA_DEC uint32_t sb_hash(strb);
+DKA_DEC size_t strb_strlen(strb);
+DKA_DEC bool strb_isempty(strb);
+DKA_DEC bool strb_isblank(strb);
+DKA_DEC bool strb_equals(strb, strb);
+DKA_DEC bool strb_equals_ic(strb, strb);
+DKA_DEC int strb_compare(strb, strb);
 
-DKA_DEC strb impl_sb__build(dk_arena *, const char *, size_t len);
-DKA_DEC bool impl_sb__push_null(dk_arena *, strb *);
-DKA_DEC bool impl_sb__pop_null(strb *);
-DKA_DEC bool impl_sb__letter_case_shift(strb *, bool);
+DKA_DEC strb impl_strb__build(dk_arena *, const char *, size_t len);
+DKA_DEC bool impl_strb__push_null(dk_arena *, strb *);
+DKA_DEC bool impl_strb__pop_null(strb *);
+DKA_DEC bool impl_strb__letter_case_shift(strb *, bool);
 
-DKA_DEC bool impl_sb__insertion(dk_arena *, strb *, char, size_t);
-DKA_DEC bool impl_sb__concatenation(dk_arena *, strb *, strb);
-DKA_DEC bool impl_sb__removal(strb *, size_t, sb__params);
-DKA_DEC bool impl_sb__reversal(strb *);
-DKA_DEC bool impl_sb__trim(strb *, bool);
-DKA_DEC bool impl_sb__trim_both(strb *);
+DKA_DEC bool impl_strb__insertion(dk_arena *, strb *, char, size_t);
+DKA_DEC bool impl_strb__concatenation(dk_arena *, strb *, strb);
+DKA_DEC bool impl_strb__removal(strb *, size_t, strb__params);
+DKA_DEC bool impl_strb__reversal(strb *);
+DKA_DEC bool impl_strb__trim(strb *, bool);
+DKA_DEC bool impl_strb__trim_both(strb *);
 
 #endif // DKA_STRING_BUILDER
 
@@ -556,56 +555,56 @@ DKA_DEC void *impl_darr__reservation(dk_arena *, void *, size_t, size_t);
 #if defined(DKA_STRING_BUILDER_IMPLEMENTATION) && !defined(DKA_STRING_BUILDER_IMPLEMENTATION_GUARD)
 #define DKA_STRING_BUILDER_IMPLEMENTATION_GUARD
 
-DKA_DEF size_t sb_strlen(strb sb) {
+DKA_DEF size_t strb_strlen(strb sb) {
   if (!sb) return 0;
   size_t len = darr_len(sb);
   if (!len) return 0;
   if (darr_last(sb) == '\0') len--;
 
   return len;
-} /* sb_strlen() */
+} /* strb_strlen() */
 
-DKA_DEF bool sb_isempty(strb sb) {
-  return ((!sb) || (sb_strlen(sb) == 0));
-} /* sb_isempty() */
+DKA_DEF bool strb_isempty(strb sb) {
+  return ((!sb) || (strb_strlen(sb) == 0));
+} /* strb_isempty() */
 
-DKA_DEF bool sb_isblank(strb sb) {
-  if (sb_isempty(sb)) return true;
+DKA_DEF bool strb_isblank(strb sb) {
+  if (strb_isempty(sb)) return true;
 
-  for (size_t n = 0; n < sb_strlen(sb); n++) {
+  for (size_t n = 0; n < strb_strlen(sb); n++) {
     if (!isspace((unsigned char)sb[n])) return false;
   }
 
   return true;
-} /* sb_isblank() */
+} /* strb_isblank() */
 
-DKA_DEF bool sb_equals(strb a, strb b) {
-  size_t a_len = sb_strlen(a);
-  size_t b_len = sb_strlen(b);
+DKA_DEF bool strb_equals(strb a, strb b) {
+  size_t a_len = strb_strlen(a);
+  size_t b_len = strb_strlen(b);
 
   if (a_len != b_len) return false;
-  else if (sb_isempty(a)) return true;
+  else if (strb_isempty(a)) return true;
 
   return (memcmp(a, b, a_len) == 0);
-} /* sb_equals() */
+} /* strb_equals() */
 
-DKA_DEF bool sb_equals_ic(strb a, strb b) {
-  size_t a_len = sb_strlen(a);
-  size_t b_len = sb_strlen(b);
+DKA_DEF bool strb_equals_ic(strb a, strb b) {
+  size_t a_len = strb_strlen(a);
+  size_t b_len = strb_strlen(b);
 
   if (a_len != b_len) return false;
-  else if (sb_isempty(a)) return true;
+  else if (strb_isempty(a)) return true;
 
   for (size_t n = 0; n < a_len; n++) {
     if (toupper((unsigned char)a[n]) != toupper((unsigned char)b[n])) return false;
   }
 
   return true;
-} /* sb_equals_ic() */
+} /* strb_equals_ic() */
 
-DKA_DEF int sb_compare(strb a, strb b) {
-  size_t a_len = sb_strlen(a);
-  size_t b_len = sb_strlen(b);
+DKA_DEF int strb_compare(strb a, strb b) {
+  size_t a_len = strb_strlen(a);
+  size_t b_len = strb_strlen(b);
 
   size_t cmp_len = (a_len < b_len) ? a_len : b_len;
   int cmp = (cmp_len) ? memcmp(a, b, cmp_len) : 0;
@@ -613,59 +612,20 @@ DKA_DEF int sb_compare(strb a, strb b) {
   if (cmp) return cmp;
   if (a_len != b_len) return (a_len < b_len) ? -1 : 1;
   return 0;
-} /* sb_compare() */
+} /* strb_compare() */
 
-DKA_DEF uint32_t sb_hash(strb sb) { /* MurmurHash3 */
-  if (sb_isempty(sb)) return 0;
-
-  uint32_t hash = 0;
-  uint32_t k;
-  size_t len = sb_strlen(sb);
-
-  for (size_t n = len >> 2; n; n--) {
-    memcpy(&k, sb, sizeof(uint32_t));
-    sb += sizeof(uint32_t);
-
-    k *= 0xcc9e2d51;
-    k = (k << 15) | (k >> 17);
-    k *= 0x1b873593;
-
-    hash ^= k;
-    hash = (hash << 13) | (hash >> 19);
-    hash = hash * 5 + 0xe6546b64;
-  }
-
-  k = 0;
-  for (size_t n = len & 3; n; n--) {
-    k <<= 8;
-    k |= (unsigned char)sb[n - 1];
-  }
-
-  k *= 0xcc9e2d51;
-  k = (k << 15) | (k >> 17);
-  k *= 0x1b873593;
-
-  hash ^= k;
-  hash ^= len;
-  hash ^= hash >> 16;
-  hash *= 0x85ebca6b;
-  hash ^= hash >> 13;
-  hash *= 0xc2b2ae35;
-  hash ^= hash >> 16;
-  return hash;
-} /* sb_hash() */
-
-DKA_DEF strb impl_sb__build(dk_arena *arena, const char *str, size_t len) {
+DKA_DEF strb impl_strb__build(dk_arena *arena, const char *str, size_t len) {
   if ((!arena) || (!str)) return NULL;
   strb sb = impl_darr__initialization(arena, sizeof(char), len + 1);
   if (!sb) return NULL;
 
   memcpy(sb, str, len + 1);
   ((darr_header *)sb - 1)->data.count = len + 1;
+  impl_strb__push_null(arena, sb);
   return sb;
-} /* impl_sb__build() */
+} /* impl_strb__build() */
 
-DKA_DEF bool impl_sb__push_null(dk_arena *arena, strb *sb) {
+DKA_DEF bool impl_strb__push_null(dk_arena *arena, strb *sb) {
   if (!sb) return false;
   if (!(*sb)) return false;
 
@@ -674,9 +634,9 @@ DKA_DEF bool impl_sb__push_null(dk_arena *arena, strb *sb) {
   if (darr_last(*sb) != '\0') return darr_push(arena, (*sb), '\0');
 
   return true;
-} /* impl_sb__push_null() */
+} /* impl_strb__push_null() */
 
-DKA_DEF bool impl_sb__pop_null(strb *sb) {
+DKA_DEF bool impl_strb__pop_null(strb *sb) {
   if (!sb) return false;
   if (!(*sb)) return false;
 
@@ -685,33 +645,33 @@ DKA_DEF bool impl_sb__pop_null(strb *sb) {
   if (darr_last(*sb) == '\0') darr_pop(*sb);
 
   return true;
-} /* impl_sb__pop_null() */
+} /* impl_strb__pop_null() */
 
-DKA_DEF bool impl_sb__letter_case_shift(strb *sb, bool to_lower) {
+DKA_DEF bool impl_strb__letter_case_shift(strb *sb, bool to_lower) {
   if (!sb) return false;
-  if (sb_isempty(*sb)) return false;
+  if (strb_isempty(*sb)) return false;
 
-  for (size_t n = 0; n < sb_strlen(*sb); n++) {
+  for (size_t n = 0; n < strb_strlen(*sb); n++) {
     if (to_lower) (*sb)[n] = tolower((unsigned char)(*sb)[n]);
     else (*sb)[n] = toupper((unsigned char)(*sb)[n]);
   }
 
   return true;
-} /* impl_sb__letter_case_shift() */
+} /* impl_strb__letter_case_shift() */
 
-DKA_DEF bool impl_sb__insertion(dk_arena *arena, strb *sb, char c, size_t n) {
+DKA_DEF bool impl_strb__insertion(dk_arena *arena, strb *sb, char c, size_t n) {
   if (!sb) return false;
   if (!(*sb)) return false;
-  impl_sb__pop_null(sb);
+  impl_strb__pop_null(sb);
 
-  size_t len = sb_strlen(*sb);
+  size_t len = strb_strlen(*sb);
   size_t cap = darr_cap(*sb);
   if (n > len) n = len;
 
   if (len >= ((!cap) ? 0 : cap - 1)) {
     char *tmp = impl_darr__growth(arena, (*sb), sizeof(char));
     if (!tmp) {
-      impl_sb__push_null(arena, sb);
+      impl_strb__push_null(arena, sb);
       return false;
     }
     (*sb) = tmp;
@@ -725,28 +685,28 @@ DKA_DEF bool impl_sb__insertion(dk_arena *arena, strb *sb, char c, size_t n) {
   (*sb)[n] = c;
   ((darr_header *)(*sb) - 1)->data.count++;
 
-  return impl_sb__push_null(arena, sb);
-} /* impl_sb__insertion() */
+  return impl_strb__push_null(arena, sb);
+} /* impl_strb__insertion() */
 
-DKA_DEF bool impl_sb__concatenation(dk_arena *arena, strb *a, strb b) {
+DKA_DEF bool impl_strb__concatenation(dk_arena *arena, strb *a, strb b) {
   if ((!a) || (!b)) return false;
   if (!(*a)) return false;
-  if (sb_isempty(b)) return true;
+  if (strb_isempty(b)) return true;
 
-  size_t a_len = sb_strlen(*a);
-  size_t b_len = sb_strlen(b);
+  size_t a_len = strb_strlen(*a);
+  size_t b_len = strb_strlen(b);
 
   if (SIZE_MAX - a_len - 1 < b_len) return false;
 
   size_t a_cap = darr_cap(*a);
-  impl_sb__pop_null(a);
+  impl_strb__pop_null(a);
   size_t requested_size = a_len + b_len + 1;
 
   if (requested_size > a_cap) {
     size_t new_cap = requested_size > a_cap * 2 ? requested_size : a_cap * 2;
     char *tmp = impl_darr__reservation(arena, (*a), sizeof(char), new_cap);
     if (!tmp) {
-      impl_sb__push_null(arena, a);
+      impl_strb__push_null(arena, a);
       return false;
     }
     (*a) = tmp;
@@ -755,14 +715,14 @@ DKA_DEF bool impl_sb__concatenation(dk_arena *arena, strb *a, strb b) {
   memmove((*a) + a_len, b, b_len);
   ((darr_header *)(*a) - 1)->data.count += b_len;
 
-  return impl_sb__push_null(arena, a);
-} /* impl_sb__concatenation() */
+  return impl_strb__push_null(arena, a);
+} /* impl_strb__concatenation() */
 
-DKA_DEF bool impl_sb__removal(strb *sb, size_t n, sb__params params) {
+DKA_DEF bool impl_strb__removal(strb *sb, size_t n, strb__params params) {
   if (!sb) return false;
-  if (sb_isempty(*sb)) return false;
+  if (strb_isempty(*sb)) return false;
 
-  size_t len = sb_strlen(*sb);
+  size_t len = strb_strlen(*sb);
   if (n >= len) return false;
 
   if (len == 1) {
@@ -771,7 +731,7 @@ DKA_DEF bool impl_sb__removal(strb *sb, size_t n, sb__params params) {
     return true;
   }
 
-  impl_sb__pop_null(sb);
+  impl_strb__pop_null(sb);
 
   if (params.ignore_ord) {
     if (!darr_rem((*sb), n)) return false;
@@ -782,13 +742,13 @@ DKA_DEF bool impl_sb__removal(strb *sb, size_t n, sb__params params) {
   (*sb)[len - 1] = '\0';
   ((darr_header *)(*sb) - 1)->data.count++;
   return true;
-} /* impl_sb__removal() */
+} /* impl_strb__removal() */
 
-DKA_DEF bool impl_sb__reversal(strb *sb) {
+DKA_DEF bool impl_strb__reversal(strb *sb) {
   if (!sb) return false;
-  if (sb_isempty(*sb)) return false;
+  if (strb_isempty(*sb)) return false;
 
-  size_t len = sb_strlen(*sb);
+  size_t len = strb_strlen(*sb);
   if (len <= 1) return true;
 
   char *left = (*sb);
@@ -801,13 +761,13 @@ DKA_DEF bool impl_sb__reversal(strb *sb) {
   }
 
   return true;
-} /* impl_sb__reversal() */
+} /* impl_strb__reversal() */
 
-DKA_DEF bool impl_sb__trim(strb *sb, bool trim_left) {
+DKA_DEF bool impl_strb__trim(strb *sb, bool trim_left) {
   if (!sb) return false;
-  if (sb_isempty(*sb)) return true;
+  if (strb_isempty(*sb)) return true;
 
-  size_t len = sb_strlen(*sb);
+  size_t len = strb_strlen(*sb);
   if (len == 1) {
     if (isspace((unsigned char)(*sb)[0])) {
       darr_pop(*sb);
@@ -815,7 +775,7 @@ DKA_DEF bool impl_sb__trim(strb *sb, bool trim_left) {
       (*sb)[0] = '\0';
       return true;
     }
-  } else if (sb_isblank(*sb)) {
+  } else if (strb_isblank(*sb)) {
     ((darr_header *)(*sb) - 1)->data.count = 1;
     (*sb)[0] = '\0';
     return true;
@@ -823,7 +783,7 @@ DKA_DEF bool impl_sb__trim(strb *sb, bool trim_left) {
 
   if (trim_left) {
     size_t whitespace_count = 0;
-    impl_sb__pop_null(sb);
+    impl_strb__pop_null(sb);
     for (size_t n = 0; n < len; n++) {
       if (!isspace((unsigned char)(*sb)[n])) break;
       whitespace_count++;
@@ -833,18 +793,18 @@ DKA_DEF bool impl_sb__trim(strb *sb, bool trim_left) {
     (*sb)[len - whitespace_count] = '\0';
     ((darr_header *)(*sb) - 1)->data.count = len - whitespace_count + 1;
   } else {
-    impl_sb__pop_null(sb);
+    impl_strb__pop_null(sb);
     while ((len > 0) && (isspace((unsigned char)(*sb)[--len]))) darr_pop(*sb);
     (*sb)[++len] = '\0';
     ((darr_header *)(*sb) - 1)->data.count++;
   }
 
   return true;
-} /* impl_sb__trim() */
+} /* impl_strb__trim() */
 
-DKA_DEF bool impl_sb__trim_both(strb *sb) {
-  return (impl_sb__trim(sb, true) && impl_sb__trim(sb, false));
-} /* impl_sb__trim_both() */
+DKA_DEF bool impl_strb__trim_both(strb *sb) {
+  return (impl_strb__trim(sb, true) && impl_strb__trim(sb, false));
+} /* impl_strb__trim_both() */
 
 #endif // DKA_STRING_BUILDER_IMPLEMENTATION
 
