@@ -141,16 +141,15 @@ you so choose. The oom handler should ideally exit the program.
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct dk_arena dk_arena;
-struct dk_arena {
-  size_t reserve;                         // total virtual memory reserved
-  size_t commit;                          // virtual memory to commit at a time
-  size_t pos;                             // current pointer position
-  size_t commit_pos;                      // current commit position
-  void (*handle_oom)(dk_arena *, size_t); // function pointer to an oom error handler; ideally exits program
-  const char *name;                       // optionally give your arena a name; must outlive arena
-  uint32_t page_size;                     // system page size
-};
+typedef struct dk_arena {
+  size_t reserve;                                // total virtual memory reserved
+  size_t commit;                                 // virtual memory to commit at a time
+  size_t pos;                                    // current pointer position
+  size_t commit_pos;                             // current commit position
+  void (*handle_oom)(struct dk_arena *, size_t); // function pointer to an oom error handler; ideally exits program
+  const char *name;                              // optionally give your arena a name; must outlive arena
+  uint32_t page_size;                            // system page size
+} dk_arena;
 
 typedef struct {
   dk_arena *arena; // pointer to parent arena

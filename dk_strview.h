@@ -1,6 +1,6 @@
 /*
 # `dk_strview.h` - public domain - Daniel Inhoi Kim, 2026
-Header-only library for virtual memory arenas. See end of file for license information.
+Header-only library for string views. See end of file for license information.
 
 ## Usage
 Macros that enable function definitions (excluding the MAKE_STATIC macros) must only be defined once in one source file
@@ -13,8 +13,8 @@ includes `<math.h>`, so compile with `-lm` as well.
 This library does not concern itself with C++ support.
 
 ### Flags
-- DKA_IMPLEMENTATION: enable function definitions
-- DKA_DYNAMIC_ARRAY: enable dynamic array function declarations
+- DKSV_IMPLEMENTATION: enable function definitions
+- DKSV_IMPLEMENTATION_MAKE_STATIC: enable dynamic array function declarations
 
 ### Example Code
   ```C
@@ -67,46 +67,45 @@ typedef struct {
   #define sb_to_sv(sb) to_strv_wlen((sb), strb_strlen(sb))
 #endif // DKA_STRING_BUILDER
 
-DKSV_DEC bool strv_isempty(strv sv);
-DKSV_DEC bool strv_isblank(strv sv);
-DKSV_DEC bool strv_equals(strv a, strv b);
-DKSV_DEC bool strv_ic_equals(strv a, strv b);
-DKSV_DEC int strv_cmp(strv a, strv b);
-DKSV_DEC bool strv_isalpha(strv sv);
-DKSV_DEC bool strv_isalnum(strv sv);
-DKSV_DEC bool strv_isdigit(strv sv);
+DKSV_DEC bool strv_isempty(strv);
+DKSV_DEC bool strv_isblank(strv);
+DKSV_DEC bool strv_equals(strv, strv);
+DKSV_DEC bool strv_ic_equals(strv, strv);
+DKSV_DEC int strv_cmp(strv, strv);
+DKSV_DEC bool strv_isalpha(strv);
+DKSV_DEC bool strv_isalnum(strv);
+DKSV_DEC bool strv_isdigit(strv);
 
-DKSV_DEC void fput_strv(strv sv, FILE *stream);
-DKSV_DEC void print_strv(strv sv);
-DKSV_DEC void println_strv(strv sv);
+DKSV_DEC void fput_strv(strv, FILE *);
+DKSV_DEC void print_strv(strv);
+DKSV_DEC void println_strv(strv);
 
-DKSV_DEC strv strv_take(strv sv, size_t n);
-DKSV_DEC strv strv_drop(strv sv, size_t n);
-DKSV_DEC strv strv_sub(strv sv, size_t start, size_t end);
-DKSV_DEC strv strv_split(strv *sv, char delimiter);
-DKSV_DEC strv strv_split_ws(strv *sv);
+DKSV_DEC strv strv_take(strv, size_t);
+DKSV_DEC strv strv_drop(strv, size_t);
+DKSV_DEC strv strv_sub(strv, size_t, size_t);
+DKSV_DEC strv strv_split(strv *, char);
+DKSV_DEC strv strv_split_ws(strv *);
 
-DKSV_DEC strv strv_trim(strv sv);
-DKSV_DEC strv strv_ltrim(strv sv);
-DKSV_DEC strv strv_rtrim(strv sv);
-DKSV_DEC strv strv_trimc(strv sv, char c);
-DKSV_DEC strv strv_ltrimc(strv sv, char c);
-DKSV_DEC strv strv_rtrimc(strv sv, char c);
+DKSV_DEC strv strv_trim(strv);
+DKSV_DEC strv strv_ltrim(strv);
+DKSV_DEC strv strv_rtrim(strv);
+DKSV_DEC strv strv_trimc(strv, char);
+DKSV_DEC strv strv_ltrimc(strv, char);
+DKSV_DEC strv strv_rtrimc(strv, char);
 
-DKSV_DEC bool strv_prefix(strv base, strv prefix);
-DKSV_DEC bool strv_suffix(strv base, strv suffix);
-DKSV_DEC bool strv_ic_prefix(strv base, strv prefix);
-DKSV_DEC bool strv_ic_suffix(strv base, strv suffix);
-DKSV_DEC bool strv_contains(strv base, strv item);
-DKSV_DEC int64_t idx_strv_contains(strv base, strv item);
-DKSV_DEC int64_t strv_idx(strv sv, char c);
-DKSV_DEC int64_t strv_idx_last(strv sv, char c);
-DKSV_DEC int32_t strv_char_at(strv sv, size_t index);
-DKSV_DEC size_t strv_count_char(strv sv, char c);
+DKSV_DEC bool strv_prefix(strv, strv);
+DKSV_DEC bool strv_suffix(strv, strv);
+DKSV_DEC bool strv_ic_prefix(strv, strv);
+DKSV_DEC bool strv_ic_suffix(strv, strv);
+DKSV_DEC bool strv_contains(strv, strv);
+DKSV_DEC int64_t idx_strv_contains(strv, strv);
+DKSV_DEC int64_t strv_idx(strv, char);
+DKSV_DEC int64_t strv_idx_last(strv, char);
+DKSV_DEC int32_t strv_char_at(strv, size_t);
+DKSV_DEC size_t strv_count_char(strv, char);
 
-DKSV_DEC strv to_strv_wlen(const char *cstring, size_t len);
-DKSV_DEC double strv_to_dbl(strv sv);
-DKSV_DEC uint32_t strv_hash(strv sv);
+DKSV_DEC strv to_strv_wlen(const char *, size_t);
+DKSV_DEC double strv_to_dbl(strv);
 
 #endif // DK_STR_VIEW_H_
 
@@ -604,46 +603,46 @@ DKSV_DEF double strv_to_dbl(strv sv) {
   return (index < sv.len) ? NAN : result * sign;
 } /* strv_to_dbl() */
 
-/*
- * Function to hash a strv struct using MurmurHash3.
- * Accepts a strv struct and returns a non-cryptographic hash value.
- * Initial seed is set to 0.
- */
-
-DKSV_DEF uint32_t strv_hash(strv sv) {
-  uint32_t hash = 0;
-  uint32_t k;
-  for (size_t n = sv.len >> 2; n; n--) {
-    memcpy(&k, sv.data, sizeof(uint32_t));
-    sv.data += sizeof(uint32_t);
-
-    k *= 0xcc9e2d51;
-    k = (k << 15) | (k >> 17);
-    k *= 0x1b873593;
-
-    hash ^= k;
-    hash = (hash << 13) | (hash >> 19);
-    hash = hash * 5 + 0xe6546b64;
-  }
-
-  k = 0;
-  for (size_t n = sv.len & 3; n; n--) {
-    k <<= 8;
-    k |= (unsigned char)sv.data[n - 1];
-  }
-
-  k *= 0xcc9e2d51;
-  k = (k << 15) | (k >> 17);
-  k *= 0x1b873593;
-
-  hash ^= k;
-  hash ^= sv.len;
-  hash ^= hash >> 16;
-  hash *= 0x85ebca6b;
-  hash ^= hash >> 13;
-  hash *= 0xc2b2ae35;
-  hash ^= hash >> 16;
-  return hash;
-} /* strv_hash() */
-
 #endif // DKSV_IMPLEMENTATION
+
+/*
+------------------------------------------------------------------------------
+This software is available under 2 licenses -- choose whichever you prefer.
+------------------------------------------------------------------------------
+ALTERNATIVE A - MIT License
+Copyright (c) 2026 Daniel Inhoi Kim
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
+ALTERNATIVE B - Public Domain (www.unlicense.org)
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+------------------------------------------------------------------------------
+*/
