@@ -420,6 +420,7 @@ typedef struct {
 #define DKA_STRLEN(str) (DKA_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
 
 #define strb_build(arena, str)           impl_strb__build((arena), (str), DKA_STRLEN(str))
+#define strb_build_wlen(arena, str, len) impl_strb__build((arena), (str), (len))
 #define strb_strdup(arena, sb)           impl_strb__build((arena), (sb), strb_strlen(sb));
 #define strb_null_terminate(arena, sb)   impl_strb__push_null((arena), &(sb))
 #define strb_tolower(sb)                 impl_strb__letter_case_shift(&(sb), true)
