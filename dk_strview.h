@@ -25,7 +25,7 @@ This library does not concern itself with C++ support.
 
   int main(void) {
     strv text = to_strv("  Hello, World!  ");
-    print_strv(text);
+    print_strv(strv_trim(text));
   }
   ```
  */
