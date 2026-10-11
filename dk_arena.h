@@ -602,9 +602,10 @@ DKA_DEF strb impl_strb__build(dk_arena *arena, const char *str, size_t len) {
   strb sb = impl_darr__initialization(arena, sizeof(char), len + 1);
   if (!sb) return NULL;
 
-  memcpy(sb, str, len + 1);
+  memcpy(sb, str, len);
+  sb[len] = '\0';
+
   ((darr_header *)sb - 1)->data.count = len + 1;
-  impl_strb__push_null(arena, &sb);
   return sb;
 } /* impl_strb__build() */
 
