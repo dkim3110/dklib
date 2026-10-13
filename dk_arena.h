@@ -430,6 +430,7 @@ typedef struct {
 #define strb_concat(arena, sb, str, len) impl_strb__concatenation((arena), &(sb), (str), (len))
 #define strb_remove(sb, n, ...)          impl_strb__removal(&(sb), (n), (strb__params){.dummy = 0, ##__VA_ARGS__})
 #define strb_reverse(sb)                 impl_strb__reversal(&(sb))
+#define strb_clear(sb) (void)(((sb)) ? (((darr_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
 
 DKA_DEC size_t strb_strlen(strb);
 DKA_DEC bool strb_isempty(strb);
@@ -466,6 +467,7 @@ typedef union {
 #define darr_cap(arr)                ((arr) ? ((darr_header *)(arr) - 1)->data.cap : 0)
 #define darr_last(arr)               ((arr)[darr_len(arr) - 1])
 #define darr_pop(arr)                (void)(((arr) && (darr_len(arr))) ? --((darr_header *)(arr) - 1)->data.count : 0)
+#define darr_clear(arr)              (void)(((arr)) ? (((darr_header *)(arr) - 1)->data.count = 0) : 0)
 
 #define darr_rev(arr)                                                                                                  \
   ({                                                                                                                   \
