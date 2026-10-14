@@ -24,7 +24,7 @@ This library does not concern itself with C++ support.
 - DKA_GIMME_ALL_MAKE_STATIC: same as `DKA_GIMME_ALL` but all functions are static inline
 
 ### Optional Function Parameters
-Several function-like macros (`dka_init()`, `dka_alloc()`, `strb_remove()`, etc.) accept optional parameters. You can
+Several function-like macros (`dka_init()`, `dka_alloc()`, `dksb_remove()`, etc.) accept optional parameters. You can
 set custom values:
 
   ```C
@@ -52,16 +52,16 @@ you so choose. The oom handler should ideally exit the program.
     dk_arena *arena = dka_init(.name = "Main Arena"); // initialize arena
     if (!arena) return 1;
 
-    strb text = strb_build(arena, "Hello, World"); // initialize string builder
+    dksb text = dksb_build(arena, "Hello, World"); // initialize string builder
     dka_temp tmp = dka_take_snapshot(arena); // begin temporary arena
 
-    size_t *numbers = darr_init(arena, size_t, 10); // initialize dynamic array
+    size_t *numbers = dkda_init(arena, size_t, 10); // initialize dynamic array
     for (size_t n = 0; n < 20; n++) {
-      darr_push(arena, numbers, n);
+      dkda_push(arena, numbers, n);
     }
 
     dka_drop_snapshot(tmp); // end temporary arena
-    strb_append(arena, text, '!');
+    dksb_append(arena, text, '!');
     printf("%s\n", text);
 
     dka_delete(arena); // deallocate all at once
@@ -409,43 +409,43 @@ DKA_DEF bool impl_dka__sys_mem_release(void *ptr, size_t size) {
 
 #include <ctype.h>
 
-typedef char *strb; // string builder
+typedef char *dksb; // string builder
 
 typedef struct {
   uint8_t dummy;   // dummy field for initialization
   bool ignore_ord; // default: false
-} strb__params;
+} dksb__params;
 
 #define DKA_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
 #define DKA_STRLEN(str) (DKA_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
 
-#define strb_build(arena, str)           impl_strb__build((arena), (str), DKA_STRLEN(str))
-#define strb_build_wlen(arena, str, len) impl_strb__build((arena), (str), (len))
-#define strb_strdup(arena, sb)           impl_strb__build((arena), (sb), strb_strlen(sb))
-#define strb_null_terminate(arena, sb)   impl_strb__push_null((arena), &(sb))
-#define strb_tolower(sb)                 impl_strb__letter_case_shift(&(sb), true)
-#define strb_toupper(sb)                 impl_strb__letter_case_shift(&(sb), false)
-#define strb_insert(arena, sb, c, n)     impl_strb__insertion((arena), &(sb), (c), (n))
-#define strb_append(arena, sb, c)        impl_strb__insertion((arena), &(sb), (c), strb_strlen(sb))
-#define strb_concat(arena, sb, str, len) impl_strb__concatenation((arena), &(sb), (str), (len))
-#define strb_remove(sb, n, ...)          impl_strb__removal(&(sb), (n), (strb__params){.dummy = 0, ##__VA_ARGS__})
-#define strb_reverse(sb)                 impl_strb__reversal(&(sb))
-#define strb_clear(sb) (void)(((sb)) ? (((darr_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
+#define dksb_build(arena, str)           impl_dksb__build((arena), (str), DKA_STRLEN(str))
+#define dksb_build_wlen(arena, str, len) impl_dksb__build((arena), (str), (len))
+#define dksb_strdup(arena, sb)           impl_dksb__build((arena), (sb), dksb_strlen(sb))
+#define dksb_null_terminate(arena, sb)   impl_dksb__push_null((arena), &(sb))
+#define dksb_tolower(sb)                 impl_dksb__letter_case_shift(&(sb), true)
+#define dksb_toupper(sb)                 impl_dksb__letter_case_shift(&(sb), false)
+#define dksb_insert(arena, sb, c, n)     impl_dksb__insertion((arena), &(sb), (c), (n))
+#define dksb_append(arena, sb, c)        impl_dksb__insertion((arena), &(sb), (c), dksb_strlen(sb))
+#define dksb_concat(arena, sb, str, len) impl_dksb__concatenation((arena), &(sb), (str), (len))
+#define dksb_remove(sb, n, ...)          impl_dksb__removal(&(sb), (n), (dksb__params){.dummy = 0, ##__VA_ARGS__})
+#define dksb_reverse(sb)                 impl_dksb__reversal(&(sb))
+#define dksb_clear(sb) (void)(((sb)) ? (((dkda_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
 
-DKA_DEC size_t strb_strlen(strb);
-DKA_DEC bool strb_isempty(strb);
-DKA_DEC bool strb_equals(strb, strb);
-DKA_DEC bool strb_equals_ic(strb, strb);
-DKA_DEC int strb_compare(strb, strb);
+DKA_DEC size_t dksb_strlen(dksb);
+DKA_DEC bool dksb_isempty(dksb);
+DKA_DEC bool dksb_equals(dksb, dksb);
+DKA_DEC bool dksb_equals_ic(dksb, dksb);
+DKA_DEC int dksb_compare(dksb, dksb);
 
-DKA_DEC strb impl_strb__build(dk_arena *, const char *, size_t len);
-DKA_DEC bool impl_strb__push_null(dk_arena *, strb *);
-DKA_DEC bool impl_strb__pop_null(strb *);
-DKA_DEC bool impl_strb__letter_case_shift(strb *, bool);
-DKA_DEC bool impl_strb__insertion(dk_arena *, strb *, char, size_t);
-DKA_DEC bool impl_strb__concatenation(dk_arena *, strb *, char *, size_t);
-DKA_DEC bool impl_strb__removal(strb *, size_t, strb__params);
-DKA_DEC bool impl_strb__reversal(strb *);
+DKA_DEC dksb impl_dksb__build(dk_arena *, const char *, size_t len);
+DKA_DEC bool impl_dksb__push_null(dk_arena *, dksb *);
+DKA_DEC bool impl_dksb__pop_null(dksb *);
+DKA_DEC bool impl_dksb__letter_case_shift(dksb *, bool);
+DKA_DEC bool impl_dksb__insertion(dk_arena *, dksb *, char, size_t);
+DKA_DEC bool impl_dksb__concatenation(dk_arena *, dksb *, char *, size_t);
+DKA_DEC bool impl_dksb__removal(dksb *, size_t, dksb__params);
+DKA_DEC bool impl_dksb__reversal(dksb *);
 
 #endif // DKA_STRING_BUILDER
 
@@ -458,138 +458,157 @@ typedef union {
     size_t cap;
   } data;
   max_align_t align;
-} darr_header;
+} dkda_header;
 
 #define DYNAMIC_ARRAY_INIT_CAPACITY (8)
 
-#define darr_init(arena, type, size) impl_darr__initialization((arena), sizeof(type), (size))
-#define darr_len(arr)                ((arr) ? ((darr_header *)(arr) - 1)->data.count : 0)
-#define darr_cap(arr)                ((arr) ? ((darr_header *)(arr) - 1)->data.cap : 0)
-#define darr_last(arr)               ((arr)[darr_len(arr) - 1])
-#define darr_pop(arr)                (void)(((arr) && (darr_len(arr))) ? --((darr_header *)(arr) - 1)->data.count : 0)
-#define darr_clear(arr)              (void)(((arr)) ? (((darr_header *)(arr) - 1)->data.count = 0) : 0)
+#define dkda_init(arena, type, size) impl_dkda__initialization((arena), sizeof(type), (size))
+#define dkda_len(arr)                ((arr) ? ((dkda_header *)(arr) - 1)->data.count : 0)
+#define dkda_cap(arr)                ((arr) ? ((dkda_header *)(arr) - 1)->data.cap : 0)
+#define dkda_last(arr)               ((arr)[dkda_len(arr) - 1])
+#define dkda_pop(arr)                (void)(((arr) && (dkda_len(arr))) ? --((dkda_header *)(arr) - 1)->data.count : 0)
+#define dkda_clear(arr)              (void)(((arr)) ? (((dkda_header *)(arr) - 1)->data.count = 0) : 0)
 
-#define darr_rev(arr)                                                                                                  \
+#define dkda_insert(arena, arr, n, element)                                                                            \
   ({                                                                                                                   \
-  bool darr_rev__success = false;                                                                                      \
+  bool dkda_insert__success = false;                                                                                   \
+  size_t dkda_insert__len = dkda_len(arr);                                                                             \
+  if ((n) <= dkda_insert__len) {                                                                                       \
+    if (!(arr) || (dkda_insert__len >= dkda_cap(arr))) {                                                               \
+      void *dkda_insert__tmp = impl_dkda__growth((arena), (arr), sizeof(*(arr)));                                      \
+      if (dkda_insert__tmp) (arr) = dkda_insert__tmp;                                                                  \
+    }                                                                                                                  \
+    if ((arr) && (dkda_insert__len < dkda_cap(arr))) {                                                                 \
+      if ((n) < dkda_insert__len) memmove(&(arr)[(n) + 1], &(arr)[(n)], (dkda_insert__len - (n)) * sizeof(*(arr)));    \
+      (arr)[(n)] = (element);                                                                                          \
+      ((dkda_header *)(arr) - 1)->data.count++;                                                                        \
+      dkda_insert__success = true;                                                                                     \
+    }                                                                                                                  \
+  } else dkda_insert__success = dkda_push((arena), (arr), (element));                                                  \
+  dkda_insert__success;                                                                                                \
+  })
+
+#define dkda_rev(arr)                                                                                                  \
+  ({                                                                                                                   \
+  bool dkda_rev__success = false;                                                                                      \
   if (arr) {                                                                                                           \
-    size_t darr_rev__len = darr_len(arr);                                                                              \
-    if (darr_rev__len > 1) {                                                                                           \
-      darr_rev__success = true;                                                                                        \
-      __typeof__(arr) darr_rev__left = (arr);                                                                          \
-      __typeof__(arr) darr_rev__right = darr_rev__left + (darr_rev__len - 1);                                          \
-      for (; darr_rev__left < darr_rev__right; darr_rev__left++, darr_rev__right--) {                                  \
-        __typeof__(*(arr)) darr_rev__tmp = (*darr_rev__left);                                                          \
-        (*darr_rev__left) = (*darr_rev__right);                                                                        \
-        (*darr_rev__right) = darr_rev__tmp;                                                                            \
+    size_t dkda_rev__len = dkda_len(arr);                                                                              \
+    if (dkda_rev__len > 1) {                                                                                           \
+      dkda_rev__success = true;                                                                                        \
+      __typeof__(arr) dkda_rev__left = (arr);                                                                          \
+      __typeof__(arr) dkda_rev__right = dkda_rev__left + (dkda_rev__len - 1);                                          \
+      for (; dkda_rev__left < dkda_rev__right; dkda_rev__left++, dkda_rev__right--) {                                  \
+        __typeof__(*(arr)) dkda_rev__tmp = (*dkda_rev__left);                                                          \
+        (*dkda_rev__left) = (*dkda_rev__right);                                                                        \
+        (*dkda_rev__right) = dkda_rev__tmp;                                                                            \
       }                                                                                                                \
     }                                                                                                                  \
   }                                                                                                                    \
-  darr_rev__success;                                                                                                   \
+  dkda_rev__success;                                                                                                   \
   })
 
-#define darr_rem(arr, n)                                                                                               \
+#define dkda_rem(arr, n)                                                                                               \
   ({                                                                                                                   \
-  bool darr_rem__success = false;                                                                                      \
+  bool dkda_rem__success = false;                                                                                      \
   if (arr) {                                                                                                           \
-    size_t darr_rem__len = darr_len(arr);                                                                              \
-    if ((n) < darr_rem__len) {                                                                                         \
-      (arr)[(n)] = (arr)[darr_rem__len - 1];                                                                           \
-      darr_pop(arr);                                                                                                   \
-      darr_rem__success = true;                                                                                        \
+    size_t dkda_rem__len = dkda_len(arr);                                                                              \
+    if ((n) < dkda_rem__len) {                                                                                         \
+      (arr)[(n)] = (arr)[dkda_rem__len - 1];                                                                           \
+      dkda_pop(arr);                                                                                                   \
+      dkda_rem__success = true;                                                                                        \
     }                                                                                                                  \
   }                                                                                                                    \
-  darr_rem__success;                                                                                                   \
+  dkda_rem__success;                                                                                                   \
   })
 
-#define darr_rem_ord(arr, n)                                                                                           \
+#define dkda_rem_ord(arr, n)                                                                                           \
   ({                                                                                                                   \
-  bool darr_rem_ord__success = false;                                                                                  \
+  bool dkda_rem_ord__success = false;                                                                                  \
   if (arr) {                                                                                                           \
-    size_t darr_rem_ord__len = darr_len(arr);                                                                          \
-    if ((n) < darr_rem_ord__len) {                                                                                     \
-      memmove(&(arr)[(n)], &(arr)[(n) + 1], (darr_rem_ord__len - (n) - 1) * sizeof(*(arr)));                           \
-      darr_pop(arr);                                                                                                   \
-      darr_rem_ord__success = true;                                                                                    \
+    size_t dkda_rem_ord__len = dkda_len(arr);                                                                          \
+    if ((n) < dkda_rem_ord__len) {                                                                                     \
+      memmove(&(arr)[(n)], &(arr)[(n) + 1], (dkda_rem_ord__len - (n) - 1) * sizeof(*(arr)));                           \
+      dkda_pop(arr);                                                                                                   \
+      dkda_rem_ord__success = true;                                                                                    \
     }                                                                                                                  \
   }                                                                                                                    \
-  darr_rem_ord__success;                                                                                               \
+  dkda_rem_ord__success;                                                                                               \
   })
 
-#define darr_push(arena, arr, element)                                                                                 \
+#define dkda_push(arena, arr, element)                                                                                 \
   ({                                                                                                                   \
-  bool darr_push__success = true;                                                                                      \
-  if (!(arr) || (darr_len(arr) >= darr_cap(arr))) {                                                                    \
-    void *darr_push__tmp = impl_darr__growth((arena), (arr), sizeof(*(arr)));                                          \
-    if (darr_push__tmp) (arr) = darr_push__tmp;                                                                        \
-    else darr_push__success = false;                                                                                   \
+  bool dkda_push__success = true;                                                                                      \
+  if (!(arr) || (dkda_len(arr) >= dkda_cap(arr))) {                                                                    \
+    void *dkda_push__tmp = impl_dkda__growth((arena), (arr), sizeof(*(arr)));                                          \
+    if (dkda_push__tmp) (arr) = dkda_push__tmp;                                                                        \
+    else dkda_push__success = false;                                                                                   \
   }                                                                                                                    \
-  if (darr_push__success) (arr)[((darr_header *)(arr) - 1)->data.count++] = (element);                                 \
-  darr_push__success;                                                                                                  \
+  if (dkda_push__success) (arr)[((dkda_header *)(arr) - 1)->data.count++] = (element);                                 \
+  dkda_push__success;                                                                                                  \
   })
 
-#define darr_reserve(arena, arr, size)                                                                                 \
+#define dkda_reserve(arena, arr, size)                                                                                 \
   ({                                                                                                                   \
-  bool darr_reserve__success = false;                                                                                  \
+  bool dkda_reserve__success = false;                                                                                  \
   if (arr) {                                                                                                           \
-    void *darr_reserve__tmp = impl_darr__reservation((arena), (arr), sizeof(*(arr)), (size));                          \
-    if (darr_reserve__tmp) {                                                                                           \
-      (arr) = darr_reserve__tmp;                                                                                       \
-      darr_reserve__success = true;                                                                                    \
+    void *dkda_reserve__tmp = impl_dkda__reservation((arena), (arr), sizeof(*(arr)), (size));                          \
+    if (dkda_reserve__tmp) {                                                                                           \
+      (arr) = dkda_reserve__tmp;                                                                                       \
+      dkda_reserve__success = true;                                                                                    \
     }                                                                                                                  \
   }                                                                                                                    \
-  darr_reserve__success;                                                                                               \
+  dkda_reserve__success;                                                                                               \
   })
 
-DKA_DEC void *impl_darr__initialization(dk_arena *, size_t, size_t);
-DKA_DEC void *impl_darr__growth(dk_arena *, void *, size_t);
-DKA_DEC void *impl_darr__reservation(dk_arena *, void *, size_t, size_t);
+DKA_DEC void *impl_dkda__initialization(dk_arena *, size_t, size_t);
+DKA_DEC void *impl_dkda__growth(dk_arena *, void *, size_t);
+DKA_DEC void *impl_dkda__reservation(dk_arena *, void *, size_t, size_t);
 
 #endif // DKA_DYNAMIC_ARRAY
 
 #if defined(DKA_STRING_BUILDER_IMPLEMENTATION) && !defined(DKA_STRING_BUILDER_IMPLEMENTATION_GUARD)
 #define DKA_STRING_BUILDER_IMPLEMENTATION_GUARD
 
-DKA_DEF size_t strb_strlen(strb sb) {
+DKA_DEF size_t dksb_strlen(dksb sb) {
   if (!sb) return 0;
-  size_t len = darr_len(sb);
+  size_t len = dkda_len(sb);
   if (!len) return 0;
-  if (darr_last(sb) == '\0') len--;
+  if (dkda_last(sb) == '\0') len--;
 
   return len;
-} /* strb_strlen() */
+} /* dksb_strlen() */
 
-DKA_DEF bool strb_isempty(strb sb) {
-  return ((!sb) || (strb_strlen(sb) == 0));
-} /* strb_isempty() */
+DKA_DEF bool dksb_isempty(dksb sb) {
+  return ((!sb) || (dksb_strlen(sb) == 0));
+} /* dksb_isempty() */
 
-DKA_DEF bool strb_equals(strb a, strb b) {
-  size_t a_len = strb_strlen(a);
-  size_t b_len = strb_strlen(b);
+DKA_DEF bool dksb_equals(dksb a, dksb b) {
+  size_t a_len = dksb_strlen(a);
+  size_t b_len = dksb_strlen(b);
 
   if (a_len != b_len) return false;
-  else if (strb_isempty(a)) return true;
+  else if (dksb_isempty(a)) return true;
 
   return (memcmp(a, b, a_len) == 0);
-} /* strb_equals() */
+} /* dksb_equals() */
 
-DKA_DEF bool strb_equals_ic(strb a, strb b) {
-  size_t a_len = strb_strlen(a);
-  size_t b_len = strb_strlen(b);
+DKA_DEF bool dksb_equals_ic(dksb a, dksb b) {
+  size_t a_len = dksb_strlen(a);
+  size_t b_len = dksb_strlen(b);
 
   if (a_len != b_len) return false;
-  else if (strb_isempty(a)) return true;
+  else if (dksb_isempty(a)) return true;
 
   for (size_t n = 0; n < a_len; n++) {
     if (toupper((unsigned char)a[n]) != toupper((unsigned char)b[n])) return false;
   }
 
   return true;
-} /* strb_equals_ic() */
+} /* dksb_equals_ic() */
 
-DKA_DEF int strb_compare(strb a, strb b) {
-  size_t a_len = strb_strlen(a);
-  size_t b_len = strb_strlen(b);
+DKA_DEF int dksb_compare(dksb a, dksb b) {
+  size_t a_len = dksb_strlen(a);
+  size_t b_len = dksb_strlen(b);
 
   size_t cmp_len = (a_len < b_len) ? a_len : b_len;
   int cmp = (cmp_len) ? memcmp(a, b, cmp_len) : 0;
@@ -597,67 +616,67 @@ DKA_DEF int strb_compare(strb a, strb b) {
   if (cmp) return cmp;
   if (a_len != b_len) return (a_len < b_len) ? -1 : 1;
   return 0;
-} /* strb_compare() */
+} /* dksb_compare() */
 
-DKA_DEF strb impl_strb__build(dk_arena *arena, const char *str, size_t len) {
+DKA_DEF dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len) {
   if ((!arena) || (!str)) return NULL;
-  strb sb = impl_darr__initialization(arena, sizeof(char), len + 1);
+  dksb sb = impl_dkda__initialization(arena, sizeof(char), len + 1);
   if (!sb) return NULL;
 
   memcpy(sb, str, len);
   sb[len] = '\0';
 
-  ((darr_header *)sb - 1)->data.count = len + 1;
+  ((dkda_header *)sb - 1)->data.count = len + 1;
   return sb;
-} /* impl_strb__build() */
+} /* impl_dksb__build() */
 
-DKA_DEF bool impl_strb__push_null(dk_arena *arena, strb *sb) {
+DKA_DEF bool impl_dksb__push_null(dk_arena *arena, dksb *sb) {
   if (!sb) return false;
   if (!(*sb)) return false;
 
-  size_t len = darr_len(*sb);
+  size_t len = dkda_len(*sb);
   if (!len) return false;
-  if (darr_last(*sb) != '\0') return darr_push(arena, (*sb), '\0');
+  if (dkda_last(*sb) != '\0') return dkda_push(arena, (*sb), '\0');
 
   return true;
-} /* impl_strb__push_null() */
+} /* impl_dksb__push_null() */
 
-DKA_DEF bool impl_strb__pop_null(strb *sb) {
+DKA_DEF bool impl_dksb__pop_null(dksb *sb) {
   if (!sb) return false;
   if (!(*sb)) return false;
 
-  size_t len = darr_len(*sb);
+  size_t len = dkda_len(*sb);
   if (!len) return false;
-  if (darr_last(*sb) == '\0') darr_pop(*sb);
+  if (dkda_last(*sb) == '\0') dkda_pop(*sb);
 
   return true;
-} /* impl_strb__pop_null() */
+} /* impl_dksb__pop_null() */
 
-DKA_DEF bool impl_strb__letter_case_shift(strb *sb, bool to_lower) {
+DKA_DEF bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower) {
   if (!sb) return false;
-  if (strb_isempty(*sb)) return false;
+  if (dksb_isempty(*sb)) return false;
 
-  for (size_t n = 0; n < strb_strlen(*sb); n++) {
+  for (size_t n = 0; n < dksb_strlen(*sb); n++) {
     if (to_lower) (*sb)[n] = tolower((unsigned char)(*sb)[n]);
     else (*sb)[n] = toupper((unsigned char)(*sb)[n]);
   }
 
   return true;
-} /* impl_strb__letter_case_shift() */
+} /* impl_dksb__letter_case_shift() */
 
-DKA_DEF bool impl_strb__insertion(dk_arena *arena, strb *sb, char c, size_t n) {
+DKA_DEF bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n) {
   if (!sb) return false;
   if (!(*sb)) return false;
-  impl_strb__pop_null(sb);
+  impl_dksb__pop_null(sb);
 
-  size_t len = strb_strlen(*sb);
-  size_t cap = darr_cap(*sb);
+  size_t len = dksb_strlen(*sb);
+  size_t cap = dkda_cap(*sb);
   if (n > len) n = len;
 
   if (len >= ((!cap) ? 0 : cap - 1)) {
-    char *tmp = impl_darr__growth(arena, (*sb), sizeof(char));
+    char *tmp = impl_dkda__growth(arena, (*sb), sizeof(char));
     if (!tmp) {
-      impl_strb__push_null(arena, sb);
+      impl_dksb__push_null(arena, sb);
       return false;
     }
     (*sb) = tmp;
@@ -669,71 +688,71 @@ DKA_DEF bool impl_strb__insertion(dk_arena *arena, strb *sb, char c, size_t n) {
   }
 
   (*sb)[n] = c;
-  ((darr_header *)(*sb) - 1)->data.count++;
+  ((dkda_header *)(*sb) - 1)->data.count++;
 
-  return impl_strb__push_null(arena, sb);
-} /* impl_strb__insertion() */
+  return impl_dksb__push_null(arena, sb);
+} /* impl_dksb__insertion() */
 
-DKA_DEF bool impl_strb__concatenation(dk_arena *arena, strb *a, char *b, size_t b_len) {
+DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, char *b, size_t b_len) {
   if ((!a) || (!b)) return false;
   if (!(*a)) return false;
-  if (strb_isempty(b)) return true;
+  if (dksb_isempty(b)) return true;
 
-  size_t a_len = strb_strlen(*a);
+  size_t a_len = dksb_strlen(*a);
 
   if (SIZE_MAX - a_len - 1 < b_len) return false;
 
-  size_t a_cap = darr_cap(*a);
-  impl_strb__pop_null(a);
+  size_t a_cap = dkda_cap(*a);
+  impl_dksb__pop_null(a);
   size_t requested_size = a_len + b_len + 1;
 
   if (requested_size > a_cap) {
     size_t new_cap = requested_size > a_cap * 2 ? requested_size : a_cap * 2;
-    char *tmp = impl_darr__reservation(arena, (*a), sizeof(char), new_cap);
+    char *tmp = impl_dkda__reservation(arena, (*a), sizeof(char), new_cap);
     if (!tmp) {
-      impl_strb__push_null(arena, a);
+      impl_dksb__push_null(arena, a);
       return false;
     }
     (*a) = tmp;
   }
 
   memmove((*a) + a_len, b, b_len);
-  ((darr_header *)(*a) - 1)->data.count += b_len;
+  ((dkda_header *)(*a) - 1)->data.count += b_len;
 
-  return impl_strb__push_null(arena, a);
-} /* impl_strb__concatenation() */
+  return impl_dksb__push_null(arena, a);
+} /* impl_dksb__concatenation() */
 
-DKA_DEF bool impl_strb__removal(strb *sb, size_t n, strb__params params) {
+DKA_DEF bool impl_dksb__removal(dksb *sb, size_t n, dksb__params params) {
   if (!sb) return false;
-  if (strb_isempty(*sb)) return false;
+  if (dksb_isempty(*sb)) return false;
 
-  size_t len = strb_strlen(*sb);
+  size_t len = dksb_strlen(*sb);
   if (n >= len) return false;
 
   if (len == 1) {
     (*sb)[0] = '\0';
-    ((darr_header *)(*sb) - 1)->data.count = 1;
+    ((dkda_header *)(*sb) - 1)->data.count = 1;
     return true;
   }
 
-  impl_strb__pop_null(sb);
+  impl_dksb__pop_null(sb);
 
   if (params.ignore_ord) {
-    if (!darr_rem((*sb), n)) return false;
+    if (!dkda_rem((*sb), n)) return false;
   } else {
-    if (!darr_rem_ord((*sb), n)) return false;
+    if (!dkda_rem_ord((*sb), n)) return false;
   }
 
   (*sb)[len - 1] = '\0';
-  ((darr_header *)(*sb) - 1)->data.count++;
+  ((dkda_header *)(*sb) - 1)->data.count++;
   return true;
-} /* impl_strb__removal() */
+} /* impl_dksb__removal() */
 
-DKA_DEF bool impl_strb__reversal(strb *sb) {
+DKA_DEF bool impl_dksb__reversal(dksb *sb) {
   if (!sb) return false;
-  if (strb_isempty(*sb)) return false;
+  if (dksb_isempty(*sb)) return false;
 
-  size_t len = strb_strlen(*sb);
+  size_t len = dksb_strlen(*sb);
   if (len <= 1) return true;
 
   char *left = (*sb);
@@ -746,56 +765,56 @@ DKA_DEF bool impl_strb__reversal(strb *sb) {
   }
 
   return true;
-} /* impl_strb__reversal() */
+} /* impl_dksb__reversal() */
 
 #endif // DKA_STRING_BUILDER_IMPLEMENTATION
 
 #if defined(DKA_DYNAMIC_ARRAY_IMPLEMENTATION) && !defined(DKA_DYNAMIC_ARRAY_IMPLEMENTATION_GUARD)
 #define DKA_DYNAMIC_ARRAY_IMPLEMENTATION_GUARD
 
-DKA_DEF void *impl_darr__initialization(dk_arena *arena, size_t elem_size, size_t count) {
+DKA_DEF void *impl_dkda__initialization(dk_arena *arena, size_t elem_size, size_t count) {
   if (!elem_size) return NULL;
-  if (count > (SIZE_MAX - sizeof(darr_header)) / elem_size) return NULL;
+  if (count > (SIZE_MAX - sizeof(dkda_header)) / elem_size) return NULL;
 
-  darr_header *header = dka_alloc(arena, sizeof(darr_header) + (elem_size * count));
+  dkda_header *header = dka_alloc(arena, sizeof(dkda_header) + (elem_size * count));
   if (!header) return NULL;
 
   header->data.count = 0;
   header->data.cap = count;
 
   return header + 1;
-} /* impl_darr__initialization() */
+} /* impl_dkda__initialization() */
 
-DKA_DEF void *impl_darr__growth(dk_arena *arena, void *arr, size_t elem_size) {
+DKA_DEF void *impl_dkda__growth(dk_arena *arena, void *arr, size_t elem_size) {
   if (!elem_size) return NULL;
-  if (!arr) return impl_darr__initialization(arena, elem_size, DYNAMIC_ARRAY_INIT_CAPACITY);
+  if (!arr) return impl_dkda__initialization(arena, elem_size, DYNAMIC_ARRAY_INIT_CAPACITY);
 
-  darr_header *header = (darr_header *)arr - 1;
+  dkda_header *header = (dkda_header *)arr - 1;
   if (header->data.cap > SIZE_MAX / 2) return NULL;
   size_t new_cap = (header->data.cap) ? header->data.cap * 2 : DYNAMIC_ARRAY_INIT_CAPACITY;
 
-  return impl_darr__reservation(arena, arr, elem_size, new_cap);
-} /* impl_darr__growth() */
+  return impl_dkda__reservation(arena, arr, elem_size, new_cap);
+} /* impl_dkda__growth() */
 
-DKA_DEF void *impl_darr__reservation(dk_arena *arena, void *arr, size_t elem_size, size_t size) {
+DKA_DEF void *impl_dkda__reservation(dk_arena *arena, void *arr, size_t elem_size, size_t size) {
   if ((!size) || (!elem_size)) return NULL;
-  if (!arr) return impl_darr__initialization(arena, elem_size, size);
+  if (!arr) return impl_dkda__initialization(arena, elem_size, size);
 
-  darr_header *header = (darr_header *)arr - 1;
+  dkda_header *header = (dkda_header *)arr - 1;
   if (header->data.cap >= size) return arr;
-  if (size > (SIZE_MAX - sizeof(darr_header)) / elem_size) return NULL;
+  if (size > (SIZE_MAX - sizeof(dkda_header)) / elem_size) return NULL;
 
-  size_t old_size = sizeof(darr_header) + (elem_size * header->data.cap);
-  size_t new_size = sizeof(darr_header) + (elem_size * size);
+  size_t old_size = sizeof(dkda_header) + (elem_size * header->data.cap);
+  size_t new_size = sizeof(dkda_header) + (elem_size * size);
 
-  darr_header *new_header = dka_realloc(arena, header, old_size, new_size);
+  dkda_header *new_header = dka_realloc(arena, header, old_size, new_size);
   if (!new_header) return NULL;
 
   header = new_header;
   header->data.cap = size;
 
   return header + 1;
-} /* impl_darr__reservation() */
+} /* impl_dkda__reservation() */
 
 #endif // DKA_DYNAMIC_ARRAY_IMPLEMENTATION
 

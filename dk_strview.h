@@ -24,8 +24,8 @@ This library does not concern itself with C++ support.
   #include <stdio.h>
 
   int main(void) {
-    strv text = to_strv("  Hello, World!  ");
-    print_strv(strv_trim(text));
+    dksv text = to_dksv("  Hello, World!  ");
+    print_dksv(dksv_trim(text));
   }
   ```
  */
@@ -53,59 +53,59 @@ This library does not concern itself with C++ support.
 typedef struct {
   const char *data;
   size_t len;
-} strv;
+} dksv;
 
-#define DKSV_NULL    ((strv){.data = NULL, .len = 0})
+#define DKSV_NULL    ((dksv){.data = NULL, .len = 0})
 #define DKSV_FMT     "%.*s"
 #define DKSV_ARG(sv) (int)(sv).len, (sv).data
 
 #define DKSV_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
 #define DKSV_STRLEN(str) (DKSV_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
-#define to_strv(cstr)    to_strv_wlen((cstr), DKSV_STRLEN(cstr))
+#define to_dksv(cstr)    to_dksv_wlen((cstr), DKSV_STRLEN(cstr))
 
 #ifdef DKA_STRING_BUILDER
-  #define sb_to_sv(sb) to_strv_wlen((sb), strb_strlen(sb))
+  #define sb_to_sv(sb) to_dksv_wlen((sb), dksb_strlen(sb))
 #endif // DKA_STRING_BUILDER
 
-DKSV_DEC bool strv_isempty(strv);
-DKSV_DEC bool strv_isblank(strv);
-DKSV_DEC bool strv_equals(strv, strv);
-DKSV_DEC bool strv_ic_equals(strv, strv);
-DKSV_DEC int strv_cmp(strv, strv);
-DKSV_DEC bool strv_isalpha(strv);
-DKSV_DEC bool strv_isalnum(strv);
-DKSV_DEC bool strv_isdigit(strv);
+DKSV_DEC bool dksv_isempty(dksv);
+DKSV_DEC bool dksv_isblank(dksv);
+DKSV_DEC bool dksv_equals(dksv, dksv);
+DKSV_DEC bool dksv_ic_equals(dksv, dksv);
+DKSV_DEC int dksv_cmp(dksv, dksv);
+DKSV_DEC bool dksv_isalpha(dksv);
+DKSV_DEC bool dksv_isalnum(dksv);
+DKSV_DEC bool dksv_isdigit(dksv);
 
-DKSV_DEC void fput_strv(strv, FILE *);
-DKSV_DEC void print_strv(strv);
-DKSV_DEC void println_strv(strv);
+DKSV_DEC void fput_dksv(dksv, FILE *);
+DKSV_DEC void print_dksv(dksv);
+DKSV_DEC void println_dksv(dksv);
 
-DKSV_DEC strv strv_take(strv, size_t);
-DKSV_DEC strv strv_drop(strv, size_t);
-DKSV_DEC strv strv_sub(strv, size_t, size_t);
-DKSV_DEC strv strv_split(strv *, char);
-DKSV_DEC strv strv_split_ws(strv *);
+DKSV_DEC dksv dksv_take(dksv, size_t);
+DKSV_DEC dksv dksv_drop(dksv, size_t);
+DKSV_DEC dksv dksv_sub(dksv, size_t, size_t);
+DKSV_DEC dksv dksv_split(dksv *, char);
+DKSV_DEC dksv dksv_split_ws(dksv *);
 
-DKSV_DEC strv strv_trim(strv);
-DKSV_DEC strv strv_ltrim(strv);
-DKSV_DEC strv strv_rtrim(strv);
-DKSV_DEC strv strv_trimc(strv, char);
-DKSV_DEC strv strv_ltrimc(strv, char);
-DKSV_DEC strv strv_rtrimc(strv, char);
+DKSV_DEC dksv dksv_trim(dksv);
+DKSV_DEC dksv dksv_ltrim(dksv);
+DKSV_DEC dksv dksv_rtrim(dksv);
+DKSV_DEC dksv dksv_trimc(dksv, char);
+DKSV_DEC dksv dksv_ltrimc(dksv, char);
+DKSV_DEC dksv dksv_rtrimc(dksv, char);
 
-DKSV_DEC bool strv_prefix(strv, strv);
-DKSV_DEC bool strv_suffix(strv, strv);
-DKSV_DEC bool strv_ic_prefix(strv, strv);
-DKSV_DEC bool strv_ic_suffix(strv, strv);
-DKSV_DEC bool strv_contains(strv, strv);
-DKSV_DEC int64_t idx_strv_contains(strv, strv);
-DKSV_DEC int64_t strv_idx(strv, char);
-DKSV_DEC int64_t strv_idx_last(strv, char);
-DKSV_DEC int32_t strv_char_at(strv, size_t);
-DKSV_DEC size_t strv_count_char(strv, char);
+DKSV_DEC bool dksv_prefix(dksv, dksv);
+DKSV_DEC bool dksv_suffix(dksv, dksv);
+DKSV_DEC bool dksv_ic_prefix(dksv, dksv);
+DKSV_DEC bool dksv_ic_suffix(dksv, dksv);
+DKSV_DEC bool dksv_contains(dksv, dksv);
+DKSV_DEC int64_t idx_dksv_contains(dksv, dksv);
+DKSV_DEC int64_t dksv_idx(dksv, char);
+DKSV_DEC int64_t dksv_idx_last(dksv, char);
+DKSV_DEC int32_t dksv_char_at(dksv, size_t);
+DKSV_DEC size_t dksv_count_char(dksv, char);
 
-DKSV_DEC strv to_strv_wlen(const char *, size_t);
-DKSV_DEC double strv_to_dbl(strv);
+DKSV_DEC dksv to_dksv_wlen(const char *, size_t);
+DKSV_DEC double dksv_to_dbl(dksv);
 
 #endif // DK_STR_VIEW_H_
 
@@ -116,55 +116,55 @@ DKSV_DEC double strv_to_dbl(strv);
 #include <math.h>
 
 /*
- * Function to verify if a given strv struct is empty.
+ * Function to verify if a given dksv struct is empty.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_isempty(strv sv) {
+DKSV_DEF bool dksv_isempty(dksv sv) {
   return ((sv.len == 0) || (!sv.data));
-} /* strv_isempty() */
+} /* dksv_isempty() */
 
 /*
- * Function to verify if a given strv struct is blank: either emoty or consisting of only whitespaces.
+ * Function to verify if a given dksv struct is blank: either emoty or consisting of only whitespaces.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_isblank(strv sv) {
-  if (strv_isempty(sv)) return true;
+DKSV_DEF bool dksv_isblank(dksv sv) {
+  if (dksv_isempty(sv)) return true;
 
   for (size_t n = 0; n < sv.len; n++) {
     if (!isspace((unsigned char)sv.data[n])) return false;
   }
 
   return true;
-} /* strv_isblank() */
+} /* dksv_isblank() */
 
 /*
- * Function to verify if two strv structs are equal.
+ * Function to verify if two dksv structs are equal.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_equals(strv a, strv b) {
+DKSV_DEF bool dksv_equals(dksv a, dksv b) {
   if (a.len != b.len) return false;
-  if (strv_isempty(a) || strv_isempty(b)) return (strv_isempty(a) == strv_isempty(b));
+  if (dksv_isempty(a) || dksv_isempty(b)) return (dksv_isempty(a) == dksv_isempty(b));
   return (memcmp(a.data, b.data, a.len) == 0);
-} /* strv_equals() */
+} /* dksv_equals() */
 
 /*
- * Function to verify if two strv structs are equal, ignoring letter case.
+ * Function to verify if two dksv structs are equal, ignoring letter case.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_ic_equals(strv a, strv b) {
+DKSV_DEF bool dksv_ic_equals(dksv a, dksv b) {
   if (a.len != b.len) return false;
-  if (strv_isempty(a) || strv_isempty(b)) return (strv_isempty(a) == strv_isempty(b));
+  if (dksv_isempty(a) || dksv_isempty(b)) return (dksv_isempty(a) == dksv_isempty(b));
 
   for (size_t n = 0; n < a.len; n++) {
     if (toupper((unsigned char)a.data[n]) != toupper((unsigned char)b.data[n])) return false;
   }
 
   return true;
-} /* strv_ic_equals() */
+} /* dksv_ic_equals() */
 
 /*
  * Function to compare two strings.
@@ -172,347 +172,347 @@ DKSV_DEF bool strv_ic_equals(strv a, strv b) {
  * and a positive value if a is greater than b.
  */
 
-DKSV_DEF int strv_cmp(strv a, strv b) {
+DKSV_DEF int dksv_cmp(dksv a, dksv b) {
   size_t cmp_len = (a.len < b.len) ? a.len : b.len;
   int cmp = (cmp_len) ? memcmp(a.data, b.data, cmp_len) : 0;
 
   if (cmp) return cmp;
   if (a.len != b.len) return (a.len < b.len) ? -1 : 1;
   return 0;
-} /* strv_cmp() */
+} /* dksv_cmp() */
 
 /*
- * Function to determine if a given strv struct consists of only alphabet characters.
+ * Function to determine if a given dksv struct consists of only alphabet characters.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_isalpha(strv sv) {
-  if (strv_isempty(sv)) return false;
+DKSV_DEF bool dksv_isalpha(dksv sv) {
+  if (dksv_isempty(sv)) return false;
 
   for (size_t n = 0; n < sv.len; n++) {
     if (!isalpha((unsigned char)sv.data[n])) return false;
   }
 
   return true;
-} /* strv_isalpha() */
+} /* dksv_isalpha() */
 
 /*
- * Function to determine if a given strv struct consists of only alphabet characters
+ * Function to determine if a given dksv struct consists of only alphabet characters
  * and digits.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_isalnum(strv sv) {
-  if (strv_isempty(sv)) return false;
+DKSV_DEF bool dksv_isalnum(dksv sv) {
+  if (dksv_isempty(sv)) return false;
 
   for (size_t n = 0; n < sv.len; n++) {
     if (!isalnum((unsigned char)sv.data[n])) return false;
   }
 
   return true;
-} /* strv_isalnum() */
+} /* dksv_isalnum() */
 
 /*
- * Function to determine if a given strv struct consists of only digits.
+ * Function to determine if a given dksv struct consists of only digits.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_isdigit(strv sv) {
-  if (strv_isempty(sv)) return false;
+DKSV_DEF bool dksv_isdigit(dksv sv) {
+  if (dksv_isempty(sv)) return false;
 
   for (size_t n = 0; n < sv.len; n++) {
     if (!isdigit((unsigned char)sv.data[n])) return false;
   }
 
   return true;
-} /* strv_isdigit() */
+} /* dksv_isdigit() */
 
 /*
- * Function to write a strv struct to a specified file stream.
+ * Function to write a dksv struct to a specified file stream.
  */
 
-DKSV_DEF void fput_strv(strv sv, FILE *stream) {
-  if ((!stream) || (strv_isempty(sv))) return;
+DKSV_DEF void fput_dksv(dksv sv, FILE *stream) {
+  if ((!stream) || (dksv_isempty(sv))) return;
   fwrite(sv.data, sizeof(char), sv.len, stream);
-} /* fput_strv() */
+} /* fput_dksv() */
 
 /*
- * Function to print a strv struct to stdout.
+ * Function to print a dksv struct to stdout.
  */
 
-DKSV_DEF void print_strv(strv sv) {
-  fput_strv(sv, stdout);
-} /* print_strv() */
+DKSV_DEF void print_dksv(dksv sv) {
+  fput_dksv(sv, stdout);
+} /* print_dksv() */
 
 /*
- * Function to print a strv struct to stdout, then a newline character.
+ * Function to print a dksv struct to stdout, then a newline character.
  */
 
-DKSV_DEF void println_strv(strv sv) {
-  print_strv(sv);
+DKSV_DEF void println_dksv(dksv sv) {
+  print_dksv(sv);
   putchar('\n');
-} /* println_strv() */
+} /* println_dksv() */
 
 /*
- * Function to take characters from a given strv struct up to the specified index.
+ * Function to take characters from a given dksv struct up to the specified index.
  * It is exclusive and thus will not take the character at index n.
  * Returns sv unmodified if empty.
  */
 
-DKSV_DEF strv strv_take(strv sv, size_t n) {
-  if (strv_isempty(sv)) return sv;
+DKSV_DEF dksv dksv_take(dksv sv, size_t n) {
+  if (dksv_isempty(sv)) return sv;
   if (n > sv.len) n = sv.len;
 
-  return (strv){.data = sv.data, .len = n};
-} /* strv_take() */
+  return (dksv){.data = sv.data, .len = n};
+} /* dksv_take() */
 
 /*
- * Function to drop characters from a strv struct up to the specified index.
+ * Function to drop characters from a dksv struct up to the specified index.
  * It is exclusive and thus will not drop the character at index n.
  * Returns sv unmodifed if empty.
  */
 
-DKSV_DEF strv strv_drop(strv sv, size_t n) {
-  if (strv_isempty(sv)) return sv;
+DKSV_DEF dksv dksv_drop(dksv sv, size_t n) {
+  if (dksv_isempty(sv)) return sv;
   if (n > sv.len) n = sv.len;
 
-  return (strv){.data = sv.data + n, .len = sv.len - n};
-} /* strv_drop() */
+  return (dksv){.data = sv.data + n, .len = sv.len - n};
+} /* dksv_drop() */
 
 /*
- * Function to extract a substring from a strv struct from the start and end indexes provided.
+ * Function to extract a substring from a dksv struct from the start and end indexes provided.
  * Start is inclusive, end is exclusive.
  */
 
-DKSV_DEF strv strv_sub(strv sv, size_t start, size_t end) {
-  return strv_drop(strv_take(sv, end), start);
-} /* strv_sub() */
+DKSV_DEF dksv dksv_sub(dksv sv, size_t start, size_t end) {
+  return dksv_drop(dksv_take(sv, end), start);
+} /* dksv_sub() */
 
 /*
- * Function to split a given strv struct based on the specifed delimiter.
- * Returns a strv struct up to the first instance of the specified delimiter, or the original string
- * if it is empty. The original strv struct retains all characters after the
+ * Function to split a given dksv struct based on the specifed delimiter.
+ * Returns a dksv struct up to the first instance of the specified delimiter, or the original string
+ * if it is empty. The original dksv struct retains all characters after the
  * delimiter; mutated by the function. The delimiter itself gets consumed.
  */
 
-DKSV_DEF strv strv_split(strv *sv, char delimiter) {
-  if (strv_isempty(*sv)) return *sv;
+DKSV_DEF dksv dksv_split(dksv *sv, char delimiter) {
+  if (dksv_isempty(*sv)) return *sv;
 
   const char *found = (const char *)memchr(sv->data, delimiter, sv->len);
   size_t n = (found) ? (size_t)(found - sv->data) : sv->len;
 
-  strv result = strv_take(*sv, n);
-  if (n < sv->len) *sv = strv_drop(*sv, n + 1);
-  else *sv = strv_drop(*sv, n);
+  dksv result = dksv_take(*sv, n);
+  if (n < sv->len) *sv = dksv_drop(*sv, n + 1);
+  else *sv = dksv_drop(*sv, n);
 
   return result;
-} /* strv_split() */
+} /* dksv_split() */
 
 /*
- * Function to split a given strv struct by whitespaces.
- * Returns a strv struct up to the first instance of a whitespace, or the original string
- * if it is empty. The original strv struct retains all characters after the
+ * Function to split a given dksv struct by whitespaces.
+ * Returns a dksv struct up to the first instance of a whitespace, or the original string
+ * if it is empty. The original dksv struct retains all characters after the
  * delimiter; mutated by the function. The delimiter itself gets consumed.
  */
 
-DKSV_DEF strv strv_split_ws(strv *sv) {
-  if (strv_isempty(*sv)) return *sv;
+DKSV_DEF dksv dksv_split_ws(dksv *sv) {
+  if (dksv_isempty(*sv)) return *sv;
 
   size_t n = 0;
   while ((n < sv->len) && (!isspace(sv->data[n]))) n++;
 
-  strv result = strv_take(*sv, n);
-  if (n < sv->len) *sv = strv_drop(*sv, n + 1);
-  else *sv = strv_drop(*sv, n);
+  dksv result = dksv_take(*sv, n);
+  if (n < sv->len) *sv = dksv_drop(*sv, n + 1);
+  else *sv = dksv_drop(*sv, n);
 
   return result;
-} /* strv_split() */
+} /* dksv_split() */
 
 /*
- * Function to trim leading and trailing whitespace from a given strv struct.
+ * Function to trim leading and trailing whitespace from a given dksv struct.
  * Returns original string if the given string is empty.
  */
 
-DKSV_DEF strv strv_trim(strv sv) {
-  return strv_ltrim(strv_rtrim(sv));
-} /* strv_trim() */
+DKSV_DEF dksv dksv_trim(dksv sv) {
+  return dksv_ltrim(dksv_rtrim(sv));
+} /* dksv_trim() */
 
 /*
- * Function to trim leading whitespace from a given strv struct.
+ * Function to trim leading whitespace from a given dksv struct.
  * Returns original string if the given string is empty.
  *
  */
 
-DKSV_DEF strv strv_ltrim(strv sv) {
-  if (strv_isempty(sv)) return sv;
-  while ((sv.len > 0) && (isspace((unsigned char)sv.data[0]))) sv = strv_drop(sv, 1);
+DKSV_DEF dksv dksv_ltrim(dksv sv) {
+  if (dksv_isempty(sv)) return sv;
+  while ((sv.len > 0) && (isspace((unsigned char)sv.data[0]))) sv = dksv_drop(sv, 1);
 
   return sv;
-} /* strv_ltrim() */
+} /* dksv_ltrim() */
 
 /*
- * Function to trim trailing whitespace from a given strv struct.
+ * Function to trim trailing whitespace from a given dksv struct.
  * Returns original string if the given string is empty.
  */
 
-DKSV_DEF strv strv_rtrim(strv sv) {
-  if (strv_isempty(sv)) return sv;
-  while ((sv.len > 0) && (isspace((unsigned char)sv.data[sv.len - 1]))) sv = strv_take(sv, sv.len - 1);
+DKSV_DEF dksv dksv_rtrim(dksv sv) {
+  if (dksv_isempty(sv)) return sv;
+  while ((sv.len > 0) && (isspace((unsigned char)sv.data[sv.len - 1]))) sv = dksv_take(sv, sv.len - 1);
 
   return sv;
-} /* strv_rtrim() */
+} /* dksv_rtrim() */
 
 /*
  * Function to trim leading and trailing instances of the provided character from
- * a given strv struct.
+ * a given dksv struct.
  * Returns original string if the given string is empty.
  */
 
-DKSV_DEF strv strv_trimc(strv sv, char c) {
-  return strv_ltrimc(strv_rtrimc(sv, c), c);
-} /* strv_trimc() */
+DKSV_DEF dksv dksv_trimc(dksv sv, char c) {
+  return dksv_ltrimc(dksv_rtrimc(sv, c), c);
+} /* dksv_trimc() */
 
 /*
- * Function to trim leading instances of the provided character from a given strv struct.
+ * Function to trim leading instances of the provided character from a given dksv struct.
  * Returns original string if the given string is empty.
  */
 
-DKSV_DEF strv strv_ltrimc(strv sv, char c) {
-  if (strv_isempty(sv)) return sv;
-  while ((sv.len > 0) && (sv.data[0] == c)) sv = strv_drop(sv, 1);
+DKSV_DEF dksv dksv_ltrimc(dksv sv, char c) {
+  if (dksv_isempty(sv)) return sv;
+  while ((sv.len > 0) && (sv.data[0] == c)) sv = dksv_drop(sv, 1);
 
   return sv;
-} /* strv_ltrimc() */
+} /* dksv_ltrimc() */
 
 /*
- * Function to trim trailing instances of the provided character from a given strv struct.
+ * Function to trim trailing instances of the provided character from a given dksv struct.
  * Returns original string if the given string is empty.
  */
 
-DKSV_DEF strv strv_rtrimc(strv sv, char c) {
-  if (strv_isempty(sv)) return sv;
-  while ((sv.len > 0) && (sv.data[sv.len - 1] == c)) sv = strv_take(sv, sv.len - 1);
+DKSV_DEF dksv dksv_rtrimc(dksv sv, char c) {
+  if (dksv_isempty(sv)) return sv;
+  while ((sv.len > 0) && (sv.data[sv.len - 1] == c)) sv = dksv_take(sv, sv.len - 1);
 
   return sv;
-} /* strv_rtrimc() */
+} /* dksv_rtrimc() */
 
 /*
- * Function to verify if a given strv struct starts with the specified prefix.
+ * Function to verify if a given dksv struct starts with the specified prefix.
  * Returns 1 if true, 0 if false. Empty strings are considered to be contained by
  * all strings.
  */
 
-DKSV_DEF bool strv_prefix(strv base, strv prefix) {
-  if (strv_isempty(prefix)) return true;
+DKSV_DEF bool dksv_prefix(dksv base, dksv prefix) {
+  if (dksv_isempty(prefix)) return true;
   if ((!base.data) || (!prefix.data)) return false;
-  if ((prefix.len > base.len) || (strv_isempty(base))) return false;
+  if ((prefix.len > base.len) || (dksv_isempty(base))) return false;
   return (memcmp(base.data, prefix.data, prefix.len) == 0);
-} /* strv_prefix() */
+} /* dksv_prefix() */
 
 /*
- * Function to verify if a given strv struct ends with the specified suffix.
+ * Function to verify if a given dksv struct ends with the specified suffix.
  * Returns 1 if true, 0 if false. Empty strings are considered to be contained by
  * all strings.
  */
 
-DKSV_DEF bool strv_suffix(strv base, strv suffix) {
-  if (strv_isempty(suffix)) return true;
+DKSV_DEF bool dksv_suffix(dksv base, dksv suffix) {
+  if (dksv_isempty(suffix)) return true;
   if ((!base.data) || (!suffix.data)) return false;
-  if ((suffix.len > base.len) || (strv_isempty(base))) return false;
+  if ((suffix.len > base.len) || (dksv_isempty(base))) return false;
   return (memcmp(base.data + (base.len - suffix.len), suffix.data, suffix.len) == 0);
-} /* strv_suffix() */
+} /* dksv_suffix() */
 
 /*
- * Function to verify if a given strv struct starts with the specified prefix, ignoring letter case.
+ * Function to verify if a given dksv struct starts with the specified prefix, ignoring letter case.
  * Returns 1 if true, 0 if false. Empty strings are considered to be contained by
  * all strings.
  */
 
-DKSV_DEF bool strv_ic_prefix(strv base, strv prefix) {
-  if (strv_isempty(prefix)) return true;
+DKSV_DEF bool dksv_ic_prefix(dksv base, dksv prefix) {
+  if (dksv_isempty(prefix)) return true;
   if ((!base.data) || (!prefix.data)) return false;
-  if ((prefix.len > base.len) || (strv_isempty(base))) return false;
-  return strv_ic_equals(strv_take(base, prefix.len), prefix);
-} /* strv_ic_prefix() */
+  if ((prefix.len > base.len) || (dksv_isempty(base))) return false;
+  return dksv_ic_equals(dksv_take(base, prefix.len), prefix);
+} /* dksv_ic_prefix() */
 
 /*
- * Function to verify if a given strv struct ends with the specified suffix, ignoring letter case.
+ * Function to verify if a given dksv struct ends with the specified suffix, ignoring letter case.
  * Returns 1 if true, 0 if false. Empty strings are considered to be contained by
  * all strings.
  */
 
-DKSV_DEF bool strv_ic_suffix(strv base, strv suffix) {
-  if (strv_isempty(suffix)) return true;
+DKSV_DEF bool dksv_ic_suffix(dksv base, dksv suffix) {
+  if (dksv_isempty(suffix)) return true;
   if ((!base.data) || (!suffix.data)) return false;
-  if ((suffix.len > base.len) || (strv_isempty(base))) return false;
-  return strv_ic_equals(strv_drop(base, base.len - suffix.len), suffix);
-} /* strv_ic_suffix() */
+  if ((suffix.len > base.len) || (dksv_isempty(base))) return false;
+  return dksv_ic_equals(dksv_drop(base, base.len - suffix.len), suffix);
+} /* dksv_ic_suffix() */
 
 /*
- * Function to verify if a given strv struct contains the specified string.
+ * Function to verify if a given dksv struct contains the specified string.
  * Empty strings are considered to be contained by all strings.
  * Returns 1 if true, 0 if false.
  */
 
-DKSV_DEF bool strv_contains(strv base, strv item) {
-  return (idx_strv_contains(base, item) != -1);
-} /* strv_contains() */
+DKSV_DEF bool dksv_contains(dksv base, dksv item) {
+  return (idx_dksv_contains(base, item) != -1);
+} /* dksv_contains() */
 
 /*
- * Function to verify if a given strv struct contains the specified string.
+ * Function to verify if a given dksv struct contains the specified string.
  * Empty strings are considered to be contained by all strings. Returns the index
- * of the first occurrence or -1 if the base strv does not contain the item.
+ * of the first occurrence or -1 if the base dksv does not contain the item.
  */
 
-DKSV_DEF int64_t idx_strv_contains(strv base, strv item) {
-  if (strv_isempty(item)) return 0;
-  if ((item.len > base.len) || (strv_isempty(base))) return -1;
+DKSV_DEF int64_t idx_dksv_contains(dksv base, dksv item) {
+  if (dksv_isempty(item)) return 0;
+  if ((item.len > base.len) || (dksv_isempty(base))) return -1;
 
   char *sub = memmem(base.data, base.len, item.data, item.len);
   return (sub) ? sub - base.data : -1;
-} /* idx_strv_contains() */
+} /* idx_dksv_contains() */
 
 /*
- * Function to identify the index within the strv struct of the first occurrence
+ * Function to identify the index within the dksv struct of the first occurrence
  * of the specified char.
  * Returns -1 if no matching characters are found.
  */
 
-DKSV_DEF int64_t strv_idx(strv sv, char c) {
-  if (strv_isempty(sv)) return -1;
+DKSV_DEF int64_t dksv_idx(dksv sv, char c) {
+  if (dksv_isempty(sv)) return -1;
   const char *found = (const char *)memchr(sv.data, c, sv.len);
   return (found) ? found - sv.data : -1;
-} /* strv_idx() */
+} /* dksv_idx() */
 
 /*
- * Function to identify the index within the strv struct of the last occurrence
+ * Function to identify the index within the dksv struct of the last occurrence
  * of the specified char.
  * Returns -1 if no matching characters are found.
  */
 
-DKSV_DEF int64_t strv_idx_last(strv sv, char c) {
-  if (strv_isempty(sv)) return -1;
+DKSV_DEF int64_t dksv_idx_last(dksv sv, char c) {
+  if (dksv_isempty(sv)) return -1;
   const char *found = (const char *)memrchr(sv.data, c, sv.len);
   return (found) ? found - sv.data : -1;
-} /* strv_idx_last() */
+} /* dksv_idx_last() */
 
 /*
- * Function to identify the character in a strv struct at the given index.
+ * Function to identify the character in a dksv struct at the given index.
  * Returns -1 if index is out of bounds.
  */
 
-DKSV_DEF int32_t strv_char_at(strv sv, size_t index) {
-  if ((index >= sv.len) || (strv_isempty(sv))) return -1;
+DKSV_DEF int32_t dksv_char_at(dksv sv, size_t index) {
+  if ((index >= sv.len) || (dksv_isempty(sv))) return -1;
   return (unsigned char)sv.data[index];
-} /* strv_char_at() */
+} /* dksv_char_at() */
 
 /*
  * Function to count the number of times the specified character occurs within the given
- * strv struct.
+ * dksv struct.
  */
 
-DKSV_DEF size_t strv_count_char(strv sv, char c) {
-  if (strv_isempty(sv)) return 0;
+DKSV_DEF size_t dksv_count_char(dksv sv, char c) {
+  if (dksv_isempty(sv)) return 0;
   size_t count = 0;
 
   for (size_t n = 0; n < sv.len; n++) {
@@ -520,29 +520,29 @@ DKSV_DEF size_t strv_count_char(strv sv, char c) {
   }
 
   return count;
-} /* strv_count_char() */
+} /* dksv_count_char() */
 
 /*
- * Function to convert a standard c string into a strv struct with a specified length.
+ * Function to convert a standard c string into a dksv struct with a specified length.
  */
 
-DKSV_DEF strv to_strv_wlen(const char *cstring, size_t len) {
+DKSV_DEF dksv to_dksv_wlen(const char *cstring, size_t len) {
   if (!cstring) return DKSV_NULL;
-  return (strv){.data = cstring, .len = len};
-} /* to_strv() */
+  return (dksv){.data = cstring, .len = len};
+} /* to_dksv() */
 
 /*
- * Function to convert a given strv struct into a double-precision floating-point value.
+ * Function to convert a given dksv struct into a double-precision floating-point value.
  * Returns NAN if it fails to convert or if invalid characters are present.
  */
 
-DKSV_DEF double strv_to_dbl(strv sv) {
-  sv = strv_trim(sv);
-  if (strv_isempty(sv)) return NAN;
+DKSV_DEF double dksv_to_dbl(dksv sv) {
+  sv = dksv_trim(sv);
+  if (dksv_isempty(sv)) return NAN;
 
-  if (strv_ic_equals(sv, to_strv("nan"))) return NAN;
-  if ((strv_ic_equals(sv, to_strv("inf"))) || (strv_ic_equals(sv, to_strv("+inf")))) return INFINITY;
-  if (strv_ic_equals(sv, to_strv("-inf"))) return -INFINITY;
+  if (dksv_ic_equals(sv, to_dksv("nan"))) return NAN;
+  if ((dksv_ic_equals(sv, to_dksv("inf"))) || (dksv_ic_equals(sv, to_dksv("+inf")))) return INFINITY;
+  if (dksv_ic_equals(sv, to_dksv("-inf"))) return -INFINITY;
 
   size_t index = 0;
   int sign = 1;
@@ -601,7 +601,7 @@ DKSV_DEF double strv_to_dbl(strv sv) {
   }
 
   return (index < sv.len) ? NAN : result * sign;
-} /* strv_to_dbl() */
+} /* dksv_to_dbl() */
 
 #endif // DKSV_IMPLEMENTATION
 
