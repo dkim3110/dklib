@@ -14,7 +14,7 @@ This library does not concern itself with C++ support.
 
 ### Flags
 - DKSV_IMPLEMENTATION: enable function definitions
-- DKSV_IMPLEMENTATION_MAKE_STATIC: enable dynamic array function declarations
+- DKSV_IMPLEMENTATION_MAKE_STATIC: same as `DKSV_IMPLEMENTATION` but all functions are static inline
 
 ### Example Code
   ```C
@@ -43,6 +43,10 @@ This library does not concern itself with C++ support.
 #ifndef DK_STR_VIEW_H_
 #define DK_STR_VIEW_H_
 
+#ifndef _GNU_SOURCE
+  #define _GNU_SOURCE
+#endif //_GNU_SOURCE
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -61,11 +65,11 @@ typedef struct {
 
 #define DKSV_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
 #define DKSV_STRLEN(str) (DKSV_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
-#define to_dksv(cstr)    to_dksv_wlen((cstr), DKSV_STRLEN(cstr))
+#define to_dksv(str)     to_dksv_wlen((str), DKSV_STRLEN(str))
 
-#ifdef DKA_STRING_BUILDER
-  #define sb_to_sv(sb) to_dksv_wlen((sb), dksb_strlen(sb))
-#endif // DKA_STRING_BUILDER
+#ifdef DKA_STRING_BUILDER_GUARD
+  #define dksb_to_dksv(sb) to_dksv_wlen((sb), dksb_strlen(sb))
+#endif // DKA_STRING_BUILDER_GUARD
 
 DKSV_DEC bool dksv_isempty(dksv);
 DKSV_DEC bool dksv_isblank(dksv);
@@ -125,7 +129,7 @@ DKSV_DEF bool dksv_isempty(dksv sv) {
 } /* dksv_isempty() */
 
 /*
- * Function to verify if a given dksv struct is blank: either emoty or consisting of only whitespaces.
+ * Function to verify if a given dksv struct is blank: either empty or consisting of only whitespaces.
  * Returns 1 if true, 0 if false.
  */
 
@@ -319,14 +323,14 @@ DKSV_DEF dksv dksv_split_ws(dksv *sv) {
   if (dksv_isempty(*sv)) return *sv;
 
   size_t n = 0;
-  while ((n < sv->len) && (!isspace(sv->data[n]))) n++;
+  while ((n < sv->len) && (!isspace((unsigned char)sv->data[n]))) n++;
 
   dksv result = dksv_take(*sv, n);
   if (n < sv->len) *sv = dksv_drop(*sv, n + 1);
   else *sv = dksv_drop(*sv, n);
 
   return result;
-} /* dksv_split() */
+} /* dksv_split_ws() */
 
 /*
  * Function to trim leading and trailing whitespace from a given dksv struct.
@@ -526,10 +530,10 @@ DKSV_DEF size_t dksv_count_char(dksv sv, char c) {
  * Function to convert a standard c string into a dksv struct with a specified length.
  */
 
-DKSV_DEF dksv to_dksv_wlen(const char *cstring, size_t len) {
-  if (!cstring) return DKSV_NULL;
-  return (dksv){.data = cstring, .len = len};
-} /* to_dksv() */
+DKSV_DEF dksv to_dksv_wlen(const char *string, size_t len) {
+  if (!string) return DKSV_NULL;
+  return (dksv){.data = string, .len = len};
+} /* to_dksv_wlen() */
 
 /*
  * Function to convert a given dksv struct into a double-precision floating-point value.
