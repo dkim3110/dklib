@@ -1,5 +1,3 @@
-#define DKA_GIMME_ALL
-
 /*
 # `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for virtual memory arenas. See end of file for license information.
@@ -581,6 +579,21 @@ typedef union {
   }                                                                                                                    \
   dkda_reserve__success;                                                                                               \
   })
+
+#define fprintf_dkda(stream, fmt, arr)                                                                                 \
+  do {                                                                                                                 \
+    size_t fput_dkda__len = dkda_len(arr);                                                                             \
+    fprintf((stream), "Array '%s' at %p: [", #arr, (void *)(arr));                                                     \
+                                                                                                                       \
+    if (fput_dkda__len == 0) {                                                                                         \
+      fputc(']', (stream));                                                                                            \
+      break;                                                                                                           \
+    }                                                                                                                  \
+    for (size_t fput_dkda__index = 0; fput_dkda__index < fput_dkda__len;                                               \
+         (fput_dkda__index++ < fput_dkda__len - 1) ? fprintf((stream), ", ") : fputc(']', (stream))) {                 \
+      fprintf((stream), (fmt), (arr)[fput_dkda__index]);                                                               \
+    }                                                                                                                  \
+  } while (false)
 
 DKA_DEC void *impl_dkda__initialization(dk_arena *, size_t, size_t);
 DKA_DEC void *impl_dkda__growth(dk_arena *, void *, size_t);
