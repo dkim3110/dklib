@@ -1,3 +1,5 @@
+#define DKA_GIMME_ALL
+
 /*
 # `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for virtual memory arenas. See end of file for license information.
@@ -185,8 +187,8 @@ typedef struct {
 #define dka_realloc(arena, ptr, oldsz, newsz, ...)                                                                     \
   impl_dka__reallocation((arena), (dka__params){.dummy = 0, ##__VA_ARGS__}, (ptr), (oldsz), (newsz))
 
-#define dka_clear(arena) impl_dka_resetting((arena), false)
-#define dka_purge(arena) impl_dka_resetting((arena), true)
+#define dka_clear(arena) impl_dka__resetting((arena), false)
+#define dka_purge(arena) impl_dka__resetting((arena), true)
 
 #define dka_take_snapshot(a)        ((dka_temp){.arena = (a), .pos = (a)->pos})
 #define dka_drop_snapshot(dka_temp) dka_rewind((dka_temp).arena, (dka_temp).pos)
@@ -320,20 +322,27 @@ DKA_DEF void *impl_dka__reallocation(dk_arena *arena, dka__params params, void *
   if (!arena) return NULL;
   if ((!ptr) || (!old_size)) return impl_dka__allocation(arena, params, new_size, false);
 
+  if (!params.align) params.align = DKA_ALIGN;
+  if ((params.align & (params.align - 1)) != 0) return NULL;
+
   uintptr_t p = (uintptr_t)ptr, b = (uintptr_t)arena;
   if (p < b + DKA_BASE_POS) return NULL;
   size_t ptr_offset = (size_t)(p - b);
   if (ptr_offset > arena->pos || old_size > arena->pos - ptr_offset) return NULL;
 
   bool is_most_recent = (ptr_offset + old_size == arena->pos);
-  if (new_size <= old_size) {
-    if (is_most_recent) arena->pos -= old_size - new_size;
-    return ptr;
-  }
+  bool is_aligned = (((uintptr_t)ptr & (params.align - 1)) == 0);
 
-  if (is_most_recent) {
-    if (!impl_dka__allocation(arena, (dka__params){.align = 1}, new_size - old_size, false)) return NULL;
-    return ptr;
+  if (is_aligned) {
+    if (new_size <= old_size) {
+      if ((is_most_recent)) arena->pos -= old_size - new_size;
+      return ptr;
+    }
+
+    if (is_most_recent) {
+      if (!impl_dka__allocation(arena, (dka__params){.align = 1}, new_size - old_size, false)) return NULL;
+      return ptr;
+    }
   }
 
   void *new_ptr = impl_dka__allocation(arena, params, new_size, false);
@@ -416,7 +425,8 @@ typedef struct {
   bool ignore_ord; // default: false
 } dksb__params;
 
-#define DKA_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
+#define DKA_IS_PTR(x)                                                                                                  \
+  _Generic(&(x), char **: true, const char **: true, char *const *: true, const char *const *: true, default: false)
 #define DKA_STRLEN(str) (DKA_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
 
 #define dksb_build(arena, str)                impl_dksb__build((arena), (str), DKA_STRLEN(str))
@@ -474,14 +484,19 @@ typedef union {
   ({                                                                                                                   \
   bool dkda_insert__success = false;                                                                                   \
   size_t dkda_insert__len = dkda_len(arr);                                                                             \
-  if ((n) <= dkda_insert__len) {                                                                                       \
+  size_t dkda_insert__index = (n);                                                                                     \
+                                                                                                                       \
+  if (dkda_insert__index <= dkda_insert__len) {                                                                        \
     if (!(arr) || (dkda_insert__len >= dkda_cap(arr))) {                                                               \
       void *dkda_insert__tmp = impl_dkda__growth((arena), (arr), sizeof(*(arr)));                                      \
       if (dkda_insert__tmp) (arr) = dkda_insert__tmp;                                                                  \
     }                                                                                                                  \
     if ((arr) && (dkda_insert__len < dkda_cap(arr))) {                                                                 \
-      if ((n) < dkda_insert__len) memmove(&(arr)[(n) + 1], &(arr)[(n)], (dkda_insert__len - (n)) * sizeof(*(arr)));    \
-      (arr)[(n)] = (element);                                                                                          \
+      if (dkda_insert__index < dkda_insert__len)                                                                       \
+        memmove(&(arr)[dkda_insert__index + 1],                                                                        \
+                &(arr)[dkda_insert__index],                                                                            \
+                (dkda_insert__len - dkda_insert__index) * sizeof(*(arr)));                                             \
+      (arr)[dkda_insert__index] = (element);                                                                           \
       ((dkda_header *)(arr) - 1)->data.count++;                                                                        \
       dkda_insert__success = true;                                                                                     \
     }                                                                                                                  \
@@ -511,10 +526,12 @@ typedef union {
 #define dkda_rem(arr, n)                                                                                               \
   ({                                                                                                                   \
   bool dkda_rem__success = false;                                                                                      \
+  size_t dkda_rem__index = (n);                                                                                        \
+                                                                                                                       \
   if (arr) {                                                                                                           \
     size_t dkda_rem__len = dkda_len(arr);                                                                              \
-    if ((n) < dkda_rem__len) {                                                                                         \
-      (arr)[(n)] = (arr)[dkda_rem__len - 1];                                                                           \
+    if (dkda_rem__index < dkda_rem__len) {                                                                             \
+      (arr)[dkda_rem__index] = (arr)[dkda_rem__len - 1];                                                               \
       dkda_pop(arr);                                                                                                   \
       dkda_rem__success = true;                                                                                        \
     }                                                                                                                  \
@@ -525,10 +542,14 @@ typedef union {
 #define dkda_rem_ord(arr, n)                                                                                           \
   ({                                                                                                                   \
   bool dkda_rem_ord__success = false;                                                                                  \
+  size_t dkda_rem_ord__index = (n);                                                                                    \
+                                                                                                                       \
   if (arr) {                                                                                                           \
     size_t dkda_rem_ord__len = dkda_len(arr);                                                                          \
-    if ((n) < dkda_rem_ord__len) {                                                                                     \
-      memmove(&(arr)[(n)], &(arr)[(n) + 1], (dkda_rem_ord__len - (n) - 1) * sizeof(*(arr)));                           \
+    if (dkda_rem_ord__index < dkda_rem_ord__len) {                                                                     \
+      memmove(&(arr)[dkda_rem_ord__index],                                                                             \
+              &(arr)[dkda_rem_ord__index + 1],                                                                         \
+              (dkda_rem_ord__len - dkda_rem_ord__index - 1) * sizeof(*(arr)));                                         \
       dkda_pop(arr);                                                                                                   \
       dkda_rem_ord__success = true;                                                                                    \
     }                                                                                                                  \
@@ -657,7 +678,8 @@ DKA_DEF bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower) {
   if (!sb) return false;
   if (dksb_isempty(*sb)) return false;
 
-  for (size_t n = 0; n < dksb_strlen(*sb); n++) {
+  size_t len = dksb_strlen(*sb);
+  for (size_t n = 0; n < len; n++) {
     if (to_lower) (*sb)[n] = tolower((unsigned char)(*sb)[n]);
     else (*sb)[n] = toupper((unsigned char)(*sb)[n]);
   }
