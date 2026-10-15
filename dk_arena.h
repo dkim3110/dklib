@@ -419,17 +419,18 @@ typedef struct {
 #define DKA_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
 #define DKA_STRLEN(str) (DKA_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
 
-#define dksb_build(arena, str)           impl_dksb__build((arena), (str), DKA_STRLEN(str))
-#define dksb_build_wlen(arena, str, len) impl_dksb__build((arena), (str), (len))
-#define dksb_strdup(arena, sb)           impl_dksb__build((arena), (sb), dksb_strlen(sb))
-#define dksb_null_terminate(arena, sb)   impl_dksb__push_null((arena), &(sb))
-#define dksb_tolower(sb)                 impl_dksb__letter_case_shift(&(sb), true)
-#define dksb_toupper(sb)                 impl_dksb__letter_case_shift(&(sb), false)
-#define dksb_insert(arena, sb, c, n)     impl_dksb__insertion((arena), &(sb), (c), (n))
-#define dksb_append(arena, sb, c)        impl_dksb__insertion((arena), &(sb), (c), dksb_strlen(sb))
-#define dksb_concat(arena, sb, str, len) impl_dksb__concatenation((arena), &(sb), (str), (len))
-#define dksb_remove(sb, n, ...)          impl_dksb__removal(&(sb), (n), (dksb__params){.dummy = 0, ##__VA_ARGS__})
-#define dksb_reverse(sb)                 impl_dksb__reversal(&(sb))
+#define dksb_build(arena, str)                impl_dksb__build((arena), (str), DKA_STRLEN(str))
+#define dksb_build_wlen(arena, str, len)      impl_dksb__build((arena), (str), (len))
+#define dksb_strdup(arena, sb)                impl_dksb__build((arena), (sb), dksb_strlen(sb))
+#define dksb_null_terminate(arena, sb)        impl_dksb__push_null((arena), &(sb))
+#define dksb_tolower(sb)                      impl_dksb__letter_case_shift(&(sb), true)
+#define dksb_toupper(sb)                      impl_dksb__letter_case_shift(&(sb), false)
+#define dksb_insert(arena, sb, c, n)          impl_dksb__insertion((arena), &(sb), (c), (n))
+#define dksb_append(arena, sb, c)             impl_dksb__insertion((arena), &(sb), (c), dksb_strlen(sb))
+#define dksb_concat(arena, sb, str)           impl_dksb__concatenation((arena), &(sb), (str), DKA_STRLEN(str))
+#define dksb_concat_wlen(arena, sb, str, len) impl_dksb__concatenation((arena), &(sb), (str), (len))
+#define dksb_remove(sb, n, ...)               impl_dksb__removal(&(sb), (n), (dksb__params){.dummy = 0, ##__VA_ARGS__})
+#define dksb_reverse(sb)                      impl_dksb__reversal(&(sb))
 #define dksb_clear(sb) (void)(((sb)) ? (((dkda_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
 
 DKA_DEC size_t dksb_strlen(dksb);
@@ -443,7 +444,7 @@ DKA_DEC bool impl_dksb__push_null(dk_arena *, dksb *);
 DKA_DEC bool impl_dksb__pop_null(dksb *);
 DKA_DEC bool impl_dksb__letter_case_shift(dksb *, bool);
 DKA_DEC bool impl_dksb__insertion(dk_arena *, dksb *, char, size_t);
-DKA_DEC bool impl_dksb__concatenation(dk_arena *, dksb *, char *, size_t);
+DKA_DEC bool impl_dksb__concatenation(dk_arena *, dksb *, const char *, size_t);
 DKA_DEC bool impl_dksb__removal(dksb *, size_t, dksb__params);
 DKA_DEC bool impl_dksb__reversal(dksb *);
 
@@ -693,10 +694,10 @@ DKA_DEF bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n) {
   return impl_dksb__push_null(arena, sb);
 } /* impl_dksb__insertion() */
 
-DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, char *b, size_t b_len) {
+DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, size_t b_len) {
   if ((!a) || (!b)) return false;
   if (!(*a)) return false;
-  if (dksb_isempty(b)) return true;
+  if (b_len == 0) return true;
 
   size_t a_len = dksb_strlen(*a);
 
