@@ -585,11 +585,12 @@ typedef union {
 #define dkda_print(stream, fmt, arr)                                                                                   \
   do {                                                                                                                 \
     size_t dkda_print__len = dkda_len(arr);                                                                            \
+    size_t dkda_print__comma_limit = dkda_print__len - 1;                                                              \
     fputc('[', (stream));                                                                                              \
                                                                                                                        \
     for (size_t dkda_print__index = 0; dkda_print__index < dkda_print__len; dkda_print__index++) {                     \
       fprintf((stream), (fmt), (arr)[dkda_print__index]);                                                              \
-      fprintf((stream), "%s", (dkda_print__index < dkda_print__len - 1) ? ", " : "");                                  \
+      if (dkda_print__index < dkda_print__comma_limit) fputs(", ", (stream));                                          \
     }                                                                                                                  \
     fputc(']', (stream));                                                                                              \
   } while (false)
