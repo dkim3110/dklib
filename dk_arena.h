@@ -594,6 +594,12 @@ typedef union {
     fputc(']', (stream));                                                                                              \
   } while (false)
 
+#define dkda_println(stream, fmt, arr)                                                                                 \
+  do {                                                                                                                 \
+    dkda_print(stream, fmt, arr);                                                                                      \
+    fputc('\n', (stream));                                                                                             \
+  } while (false)
+
 #define dkda_print_fancy(stream, fmt, arr)                                                                             \
   do {                                                                                                                 \
     fprintf((stream),                                                                                                  \
@@ -602,7 +608,8 @@ typedef union {
             dkda_len(arr),                                                                                             \
             dkda_cap(arr),                                                                                             \
             (uintptr_t)(arr));                                                                                         \
-    dkda_print((stream), (fmt), (arr));                                                                                \
+    dkda_print(stream, fmt, arr);                                                                                      \
+    fputc('\n', (stream));                                                                                             \
   } while (false)
 
 DKA_DEC void *impl_dkda__initialization(dk_arena *, size_t, size_t);
