@@ -461,6 +461,8 @@ DKA_DEC bool impl_dksb__reversal(dksb *);
 #if defined(DKA_DYNAMIC_ARRAY) && !defined(DKA_DYNAMIC_ARRAY_GUARD)
 #define DKA_DYNAMIC_ARRAY_GUARD
 
+#include <inttypes.h>
+
 typedef union {
   struct {
     size_t count;
@@ -580,19 +582,22 @@ typedef union {
   dkda_reserve__success;                                                                                               \
   })
 
-#define fprintf_dkda(stream, fmt, arr)                                                                                 \
+#define dkda_print(stream, fmt, arr)                                                                                   \
   do {                                                                                                                 \
-    size_t fput_dkda__len = dkda_len(arr);                                                                             \
-    fprintf((stream), "Array '%s' at %p: [", #arr, (void *)(arr));                                                     \
+    size_t dkda_print__len = dkda_len(arr);                                                                            \
+    fputc('[', (stream));                                                                                              \
                                                                                                                        \
-    if (fput_dkda__len == 0) {                                                                                         \
-      fputc(']', (stream));                                                                                            \
-      break;                                                                                                           \
+    for (size_t dkda_print__index = 0; dkda_print__index < dkda_print__len; dkda_print__index++) {                     \
+      fprintf((stream), (fmt), (arr)[dkda_print__index]);                                                              \
+      fprintf((stream), "%s", (dkda_print__index < dkda_print__len - 1) ? ", " : "");                                  \
     }                                                                                                                  \
-    for (size_t fput_dkda__index = 0; fput_dkda__index < fput_dkda__len;                                               \
-         (fput_dkda__index++ < fput_dkda__len - 1) ? fprintf((stream), ", ") : fputc(']', (stream))) {                 \
-      fprintf((stream), (fmt), (arr)[fput_dkda__index]);                                                               \
-    }                                                                                                                  \
+    fputc(']', (stream));                                                                                              \
+  } while (false)
+
+#define dkda_print_fancy(stream, fmt, arr)                                                                             \
+  do {                                                                                                                 \
+    fprintf((stream), "Array '%s' at 0x%" PRIXPTR ": ", #arr, (uintptr_t)(arr));                                       \
+    dkda_print((stream), (fmt), (arr));                                                                                \
   } while (false)
 
 DKA_DEC void *impl_dkda__initialization(dk_arena *, size_t, size_t);
@@ -609,7 +614,6 @@ DKA_DEF size_t dksb_strlen(dksb sb) {
   size_t len = dkda_len(sb);
   if (!len) return 0;
   if (dkda_last(sb) == '\0') len--;
-
   return len;
 } /* dksb_strlen() */
 
