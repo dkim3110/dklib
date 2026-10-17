@@ -24,8 +24,8 @@ This library does not concern itself with C++ support.
   #include <stdio.h>
 
   int main(void) {
-    dksv text = to_dksv("  Hello, World!  ");
-    print_dksv(dksv_trim(text));
+    dksv text = dksv_view("  Hello, World!  ");
+    dksv_print(dksv_trim(text));
   }
   ```
  */
@@ -65,10 +65,10 @@ typedef struct {
 
 #define DKSV_IS_PTR(x)   _Generic(&(x), char **: true, const char **: true, default: false)
 #define DKSV_STRLEN(str) (DKSV_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
-#define to_dksv(str)     to_dksv_wlen((str), DKSV_STRLEN(str))
+#define dksv_view(str)   dksv_view_wlen((str), DKSV_STRLEN(str))
 
 #ifdef DKA_STRING_BUILDER_GUARD
-  #define dksb_to_dksv(sb) to_dksv_wlen((sb), dksb_strlen(sb))
+  #define dksb_to_dksv(sb) dksv_view_wlen((sb), dksb_strlen(sb))
 #endif // DKA_STRING_BUILDER_GUARD
 
 DKSV_DEC bool dksv_isempty(dksv);
@@ -80,9 +80,9 @@ DKSV_DEC bool dksv_isalpha(dksv);
 DKSV_DEC bool dksv_isalnum(dksv);
 DKSV_DEC bool dksv_isdigit(dksv);
 
-DKSV_DEC void fput_dksv(dksv, FILE *);
-DKSV_DEC void print_dksv(dksv);
-DKSV_DEC void println_dksv(dksv);
+DKSV_DEC void dksv_fput(dksv, FILE *);
+DKSV_DEC void dksv_print(dksv);
+DKSV_DEC void dksv_println(dksv);
 
 DKSV_DEC dksv dksv_take(dksv, size_t);
 DKSV_DEC dksv dksv_drop(dksv, size_t);
@@ -108,7 +108,7 @@ DKSV_DEC int64_t dksv_idx_last(dksv, char);
 DKSV_DEC int32_t dksv_char_at(dksv, size_t);
 DKSV_DEC size_t dksv_count_char(dksv, char);
 
-DKSV_DEC dksv to_dksv_wlen(const char *, size_t);
+DKSV_DEC dksv dksv_view_wlen(const char *, size_t);
 DKSV_DEC double dksv_to_dbl(dksv);
 
 #endif // DK_STR_VIEW_H_
@@ -235,27 +235,27 @@ DKSV_DEF bool dksv_isdigit(dksv sv) {
  * Function to write a dksv struct to a specified file stream.
  */
 
-DKSV_DEF void fput_dksv(dksv sv, FILE *stream) {
+DKSV_DEF void dksv_fput(dksv sv, FILE *stream) {
   if ((!stream) || (dksv_isempty(sv))) return;
   fwrite(sv.data, sizeof(char), sv.len, stream);
-} /* fput_dksv() */
+} /* dksv_fput() */
 
 /*
  * Function to print a dksv struct to stdout.
  */
 
-DKSV_DEF void print_dksv(dksv sv) {
-  fput_dksv(sv, stdout);
-} /* print_dksv() */
+DKSV_DEF void dksv_print(dksv sv) {
+  dksv_fput(sv, stdout);
+} /* dksv_print() */
 
 /*
  * Function to print a dksv struct to stdout, then a newline character.
  */
 
-DKSV_DEF void println_dksv(dksv sv) {
-  print_dksv(sv);
+DKSV_DEF void dksv_println(dksv sv) {
+  dksv_print(sv);
   putchar('\n');
-} /* println_dksv() */
+} /* dksv_println() */
 
 /*
  * Function to take characters from a given dksv struct up to the specified index.
@@ -530,10 +530,10 @@ DKSV_DEF size_t dksv_count_char(dksv sv, char c) {
  * Function to convert a standard c string into a dksv struct with a specified length.
  */
 
-DKSV_DEF dksv to_dksv_wlen(const char *string, size_t len) {
+DKSV_DEF dksv dksv_view_wlen(const char *string, size_t len) {
   if (!string) return DKSV_NULL;
   return (dksv){.data = string, .len = len};
-} /* to_dksv_wlen() */
+} /* dksv_view_wlen() */
 
 /*
  * Function to convert a given dksv struct into a double-precision floating-point value.
@@ -544,9 +544,9 @@ DKSV_DEF double dksv_to_dbl(dksv sv) {
   sv = dksv_trim(sv);
   if (dksv_isempty(sv)) return NAN;
 
-  if (dksv_ic_equals(sv, to_dksv("nan"))) return NAN;
-  if ((dksv_ic_equals(sv, to_dksv("inf"))) || (dksv_ic_equals(sv, to_dksv("+inf")))) return INFINITY;
-  if (dksv_ic_equals(sv, to_dksv("-inf"))) return -INFINITY;
+  if (dksv_ic_equals(sv, dksv_view("nan"))) return NAN;
+  if ((dksv_ic_equals(sv, dksv_view("inf"))) || (dksv_ic_equals(sv, dksv_view("+inf")))) return INFINITY;
+  if (dksv_ic_equals(sv, dksv_view("-inf"))) return -INFINITY;
 
   size_t index = 0;
   int sign = 1;
