@@ -1,5 +1,5 @@
 /*
-# `dktw_typewriter.h` - public domain - Daniel Inhoi Kim, 2026
+# `dk_typewriter.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for a typewriter style print function + cross-platform high-resultolution sleep function. See end of
 file for license information.
 
@@ -19,7 +19,7 @@ This library does not concern itself with C++ support.
 ### Example Code
   ```C
   #define DKTW_IMPLEMENTATION
-  #include "dktw_typewriter.h"
+  #include "dk_typewriter.h"
 
   #include <stdlib.h>
   #include <time.h>
