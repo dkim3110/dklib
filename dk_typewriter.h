@@ -111,7 +111,7 @@ DKTW_DEF int dktw_sleep(double sec) {
   }
 
 #ifdef _WIN32
-  Sleep((DWORD)(sec * 1000.0));
+  Sleep((DWORD)(sec * 1e3));
   return 0;
 #else
   struct timespec ts;
