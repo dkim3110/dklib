@@ -1,5 +1,3 @@
-#define DKTW_IMPLEMENTATION
-
 /*
 # `dktw_typewriter.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for a typewriter style print function + cross-platform high-resultolution sleep function. See end of
