@@ -56,15 +56,9 @@ you so choose. The oom handler should ideally exit the program.
 
     dka_snapshot(arena) {
       size_t *numbers = dkda_init(arena, size_t, 20);
-      size_t *dummy = NULL;
       for (size_t n = 0; n < 10; n++) dkda_push(arena, numbers, n);
       dkda_println(stdout, "%zu", numbers);
       dkda_print_fancy(stdout, "%zu", numbers);
-
-      putchar('\n');
-
-      dkda_println(stdout, "%zu", dummy);
-      dkda_print_fancy(stdout, "%zu", dummy);
     }
 
     dksb_append(arena, text, '!');
