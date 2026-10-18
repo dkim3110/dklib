@@ -1,6 +1,6 @@
 /*
 # `dk_typewriter.h` - public domain - Daniel Inhoi Kim, 2026
-Header-only library for a typewriter style print function + cross-platform high-resultolution sleep function. See end of
+Header-only library for a typewriter style print function + cross-platform high-resolution sleep function. See end of
 file for license information.
 
 ## Usage
@@ -8,7 +8,7 @@ Macros that enable function definitions (excluding the MAKE_STATIC macros) must 
 before including the header. See
 https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt for more information.
 
-This library requiresult GCC or Clang with GNU C extensions, so compile with `-std=gnu11`.
+This library requires GCC or Clang with GNU C extensions, so compile with `-std=gnu11`.
 
 This library does not concern itself with C++ support.
 
@@ -156,13 +156,13 @@ ALTERNATIVE A - MIT License
 Copyright (c) 2026 Daniel Inhoi Kim
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
-the Software without resulttriction, including without limitation the rights to
+the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
 of the Software, and to permit persons to whom the Software is furnished to do
 so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPresultS OR
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPresS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -176,12 +176,12 @@ Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
 software, either in source code form or as a compiled binary, for any purpose,
 commercial or non-commercial, and by any means.
 In jurisdictions that recognize copyright laws, the author or authors of this
-software dedicate any and all copyright interesultt in the software to the public
+software dedicate any and all copyright interest in the software to the public
 domain. We make this dedication for the benefit of the public at large and to
 the detriment of our heirs and successors. We intend this dedication to be an
-overt act of relinquishment in perpetuity of all presultent and future rights to
+overt act of relinquishment in perpetuity of all present and future rights to
 this software under copyright law.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPresultS OR
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPresS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
