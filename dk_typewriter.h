@@ -81,7 +81,7 @@ DKTW_DEC bool dktw_typewriter(FILE *stream, double speed, const char *s);
   #include <time.h>
 #endif
 
-static inline bool impl_dktw__is_pause(unsigned char c) {
+static inline bool hlpr_dktw__is_pause(unsigned char c) {
   switch (c) {
     case ';':  /* fallthrough */
     case ':':  /* fallthrough */
@@ -95,7 +95,7 @@ static inline bool impl_dktw__is_pause(unsigned char c) {
   }
 }
 
-static inline bool impl_dktw__is_stop(unsigned char c) {
+static inline bool hlpr_dktw__is_stop(unsigned char c) {
   switch (c) {
     case '.': /* fallthrough */
     case '?': /* fallthrough */
@@ -139,8 +139,8 @@ DKTW_DEF bool dktw_typewriter(FILE *stream, double speed, const char *s) {
     fflush(stream);
 
     if ((s[n + 1] == '\0') || (isspace((unsigned char)s[n + 1]))) {
-      if (impl_dktw__is_stop((unsigned char)s[n])) dktw_sleep((383 DKTW_MILLISECONDS) / speed);
-      else if (impl_dktw__is_pause((unsigned char)s[n])) dktw_sleep((153 DKTW_MILLISECONDS) / speed);
+      if (hlpr_dktw__is_stop((unsigned char)s[n])) dktw_sleep((383 DKTW_MILLISECONDS) / speed);
+      else if (hlpr_dktw__is_pause((unsigned char)s[n])) dktw_sleep((153 DKTW_MILLISECONDS) / speed);
     }
 
     dktw_sleep(((70.0 + rand() % 16) DKTW_MILLISECONDS) / speed);
