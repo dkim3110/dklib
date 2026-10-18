@@ -85,6 +85,11 @@ static inline bool impl_dktw__is_pause(unsigned char c) {
   switch (c) {
     case ';': /* fallthrough */
     case ':': /* fallthrough */
+    case ')':  /* fallthrough */
+    case ']':  /* fallthrough */
+    case '}':  /* fallthrough */
+    case '\'': /* fallthrough */
+    case '\"': /* fallthrough */
     case ',': return true;
     default:  return false;
   }
@@ -94,11 +99,6 @@ static inline bool impl_dktw__is_stop(unsigned char c) {
   switch (c) {
     case '.':  /* fallthrough */
     case '?':  /* fallthrough */
-    case ')':  /* fallthrough */
-    case ']':  /* fallthrough */
-    case '}':  /* fallthrough */
-    case '\'': /* fallthrough */
-    case '\"': /* fallthrough */
     case '!':  return true;
     default:   return false;
   }
