@@ -81,21 +81,16 @@ DKTW_DEC bool dktw_typewriter(FILE *stream, double speed, const char *s);
   #include <time.h>
 #endif
 
-static inline bool hlpr_dktw__is_pause(unsigned char c) {
+static inline bool hlpr_dktw__is_pause(char c) {
   switch (c) {
-    case ';':  /* fallthrough */
-    case ':':  /* fallthrough */
-    case ')':  /* fallthrough */
-    case ']':  /* fallthrough */
-    case '}':  /* fallthrough */
-    case '\'': /* fallthrough */
-    case '\"': /* fallthrough */
-    case ',':  return true;
-    default:   return false;
+    case ';': /* fallthrough */
+    case ':': /* fallthrough */
+    case ',': return true;
+    default:  return false;
   }
 }
 
-static inline bool hlpr_dktw__is_stop(unsigned char c) {
+static inline bool hlpr_dktw__is_stop(char c) {
   switch (c) {
     case '.': /* fallthrough */
     case '?': /* fallthrough */
@@ -104,8 +99,19 @@ static inline bool hlpr_dktw__is_stop(unsigned char c) {
   }
 }
 
+static inline bool hlpr_dktw__is_closing(char c) {
+  switch (c) {
+    case ')':  /* fallthrough */
+    case ']':  /* fallthrough */
+    case '}':  /* fallthrough */
+    case '\'': /* fallthrough */
+    case '\"': return true;
+    default:   return false;
+  }
+}
+
 DKTW_DEF int dktw_sleep(double sec) {
-  if (sec < 0) {
+  if (!(sec >= 0.0)) {
     errno = EINVAL;
     return -1;
   }
@@ -119,6 +125,7 @@ DKTW_DEF int dktw_sleep(double sec) {
   struct timespec ts;
   ts.tv_sec = sec;
   ts.tv_nsec = (sec - (double)ts.tv_sec) * 1e9;
+  if (ts.tv_nsec > 999999999L) ts.tv_nsec = 999999999L;
 
   do {
     result = nanosleep(&ts, &ts);
@@ -131,19 +138,24 @@ DKTW_DEF int dktw_sleep(double sec) {
 DKTW_DEF bool dktw_typewriter(FILE *stream, double speed, const char *s) {
   if ((!stream) || (!s)) return false;
 
-  if (speed < 0.1) speed = 0.1;
+  if (!(speed >= 0.1)) speed = 0.1;
   else if (speed > 10.0) speed = 10.0;
 
   for (size_t n = 0; s[n] != '\0'; n++) {
     fputc(s[n], stream);
+    if ((s[n + 1] & 0xC0) == 0x80) continue;
     fflush(stream);
 
     if ((s[n + 1] == '\0') || (isspace((unsigned char)s[n + 1]))) {
-      if (hlpr_dktw__is_stop((unsigned char)s[n])) dktw_sleep((383 DKTW_MILLISECONDS) / speed);
-      else if (hlpr_dktw__is_pause((unsigned char)s[n])) dktw_sleep((153 DKTW_MILLISECONDS) / speed);
+      if (hlpr_dktw__is_stop(s[n])) dktw_sleep((380 DKTW_MILLISECONDS) / speed);
+      else if (hlpr_dktw__is_pause(s[n])) dktw_sleep((150 DKTW_MILLISECONDS) / speed);
+      else if ((n > 0) && (hlpr_dktw__is_closing(s[n]))) {
+        if (hlpr_dktw__is_stop(s[n - 1])) dktw_sleep((380 DKTW_MILLISECONDS) / speed);
+        else if (hlpr_dktw__is_pause(s[n - 1])) dktw_sleep((150 DKTW_MILLISECONDS) / speed);
+      }
     }
 
-    dktw_sleep(((70.0 + rand() % 16) DKTW_MILLISECONDS) / speed);
+    dktw_sleep(((70 + rand() % 16) DKTW_MILLISECONDS) / speed);
   }
 
   return true;
