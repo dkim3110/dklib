@@ -28,7 +28,7 @@ Several function-like macros (`dka_init()`, `dka_alloc()`, `dksb_remove()`, etc.
 set custom values:
 
   ```C
-  char *buf = dka_alloc(arena, KiB(1), .align = 64);
+  char *buf = dka_alloc(arena, DKA_KiB(1), .align = 64);
   ```
 
 Consult the parameter structs for a full list of defaults.
@@ -49,22 +49,28 @@ you so choose. The oom handler should ideally exit the program.
   #include <stdio.h>
 
   int main(void) {
-    dk_arena *arena = dka_init(.name = "Main Arena"); // initialize arena
+    dk_arena *arena = dka_init(.name = "Main Arena");
     if (!arena) return 1;
 
-    dksb text = dksb_build(arena, "Hello, World"); // initialize string builder
-    dka_temp tmp = dka_take_snapshot(arena); // begin temporary arena
+    dksb text = dksb_build(arena, "Hello, World");
 
-    size_t *numbers = dkda_init(arena, size_t, 10); // initialize dynamic array
-    for (size_t n = 0; n < 20; n++) {
-      dkda_push(arena, numbers, n);
+    dka_snapshot(arena) {
+      size_t *numbers = dkda_init(arena, size_t, 20);
+      size_t *dummy = NULL;
+      for (size_t n = 0; n < 10; n++) dkda_push(arena, numbers, n);
+      dkda_println(stdout, "%zu", numbers);
+      dkda_print_fancy(stdout, "%zu", numbers);
+
+      putchar('\n');
+
+      dkda_println(stdout, "%zu", dummy);
+      dkda_print_fancy(stdout, "%zu", dummy);
     }
 
-    dka_drop_snapshot(tmp); // end temporary arena
     dksb_append(arena, text, '!');
     printf("%s\n", text);
 
-    dka_delete(arena); // deallocate all at once
+    dka_delete(arena);
     return 0;
   }
   ```
@@ -170,9 +176,9 @@ typedef struct {
 #define DKA_BASE_POS            (sizeof(dk_arena))
 #define DKA_ALIGN               (alignof(max_align_t))
 
-#define KiB(n) ((size_t)(n) << 10)
-#define MiB(n) ((size_t)(n) << 20)
-#define GiB(n) ((size_t)(n) << 30)
+#define DKA_KiB(n) ((size_t)(n) << 10)
+#define DKA_MiB(n) ((size_t)(n) << 20)
+#define DKA_GiB(n) ((size_t)(n) << 30)
 
 #define dka_init(...) impl_dka__initialization((dka__params){.dummy = 0, ##__VA_ARGS__})
 
@@ -190,6 +196,12 @@ typedef struct {
 
 #define dka_take_snapshot(a)        ((dka_temp){.arena = (a), .pos = (a)->pos})
 #define dka_drop_snapshot(dka_temp) dka_rewind((dka_temp).arena, (dka_temp).pos)
+
+#define dka_snapshot(a)                                                                                                \
+  for (dka_temp dka_snapshot__tmp = dka_take_snapshot(a), *dka_snapshot__complete = &dka_snapshot__tmp;                \
+       dka_snapshot__complete;                                                                                         \
+       dka_snapshot__complete = NULL, dka_drop_snapshot(dka_snapshot__tmp))                                            \
+    for (bool dka_snapshot__done = false; !dka_snapshot__done; dka_snapshot__done = true)
 
 DKA_DEC void dka_oom_handler(dk_arena *, size_t);
 DKA_DEC void dka_delete(dk_arena *);
@@ -238,8 +250,8 @@ DKA_DEF void dka_rewind(dk_arena *arena, size_t pos) {
 } /* dka_rewind() */
 
 DKA_DEF dk_arena *impl_dka__initialization(dka__params params) {
-  if (!params.reserve_size) params.reserve_size = GiB(1);
-  if (!params.commit_size) params.commit_size = MiB(2);
+  if (!params.reserve_size) params.reserve_size = DKA_GiB(1);
+  if (!params.commit_size) params.commit_size = DKA_MiB(2);
   if (!params.oom_handler) params.oom_handler = dka_oom_handler;
 
   if (params.commit_size > params.reserve_size) params.commit_size = params.reserve_size;
