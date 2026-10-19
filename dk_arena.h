@@ -10,6 +10,8 @@ https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/do
 This library requires GCC or Clang with GNU C extensions, so compile with `-std=gnu11`. It targets Linux and Windows
 only. Windows support is written against the Win32 API but untested.
 
+Most function-like macros evaluate arguments multiple times, so do not pass any that will cause side effects.
+
 This library does not concern itself with C++ support.
 
 ### Flags
@@ -546,12 +548,10 @@ typedef union {
 #define dkda_reserve(arena, arr, size)                                                                                 \
   ({                                                                                                                   \
   bool dkda_reserve__success = false;                                                                                  \
-  if (arr) {                                                                                                           \
-    void *dkda_reserve__tmp = impl_dkda__reservation((arena), (arr), sizeof(*(arr)), (size));                          \
-    if (dkda_reserve__tmp) {                                                                                           \
-      (arr) = dkda_reserve__tmp;                                                                                       \
-      dkda_reserve__success = true;                                                                                    \
-    }                                                                                                                  \
+  void *dkda_reserve__tmp = impl_dkda__reservation((arena), (arr), sizeof(*(arr)), (size));                            \
+  if (dkda_reserve__tmp) {                                                                                             \
+    (arr) = dkda_reserve__tmp;                                                                                         \
+    dkda_reserve__success = true;                                                                                      \
   }                                                                                                                    \
   dkda_reserve__success;                                                                                               \
   })
@@ -769,7 +769,9 @@ DKA_DEF int dksb_compare(dksb a, dksb b) {
 } /* dksb_compare() */
 
 DKA_DEF dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len) {
-  if (!arena) return NULL;
+  if ((!arena) || (!str)) return NULL;
+
+  if (__builtin_add_overflow(len, (size_t)1, &len)) goto error_oom;
   dksb sb = impl_dkda__initialization(arena, sizeof(char), len + 1);
   if (!sb) return NULL;
 
@@ -778,6 +780,10 @@ DKA_DEF dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len) {
 
   ((dkda_header *)sb - 1)->data.count = len + 1;
   return sb;
+
+error_oom:
+  arena->handle_oom(arena, SIZE_MAX);
+  return NULL;
 } /* impl_dksb__build() */
 
 DKA_DEF bool impl_dksb__push_null(dk_arena *arena, dksb *sb) {
