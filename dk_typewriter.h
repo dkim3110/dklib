@@ -88,7 +88,7 @@ static inline bool hlpr_dktw__is_pause(char c) {
     case ',': return true;
     default:  return false;
   }
-}
+} /* hlpr_dktw__is_pause() */
 
 static inline bool hlpr_dktw__is_stop(char c) {
   switch (c) {
@@ -97,7 +97,7 @@ static inline bool hlpr_dktw__is_stop(char c) {
     case '!': return true;
     default:  return false;
   }
-}
+} /* hlpr_dktw__is_stop() */
 
 static inline bool hlpr_dktw__is_closing(char c) {
   switch (c) {
@@ -108,7 +108,7 @@ static inline bool hlpr_dktw__is_closing(char c) {
     case '\"': return true;
     default:   return false;
   }
-}
+} /* hlpr_dktw__is_closing() */
 
 DKTW_DEF int dktw_sleep(double sec) {
   if (!(sec >= 0.0)) {
@@ -133,7 +133,7 @@ DKTW_DEF int dktw_sleep(double sec) {
 
   return result;
 #endif // _WIN32
-}
+} /* dktw_sleep() */
 
 DKTW_DEF bool dktw_typewriter(FILE *stream, double speed, const char *s) {
   if ((!stream) || (!s)) return false;
@@ -159,7 +159,7 @@ DKTW_DEF bool dktw_typewriter(FILE *stream, double speed, const char *s) {
   }
 
   return true;
-}
+} /* dktw_typewriter() */
 
 #endif // DKTW_IMPLEMENTATION
 

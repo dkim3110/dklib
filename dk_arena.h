@@ -43,10 +43,10 @@ you so choose. The oom handler should ideally exit the program.
 
 ### Example Code
   ```C
-  #define DKA_GIMME_ALL
-  #include "dk_arena.h"
+ #define DKA_GIMME_ALL
+ #include "dk_arena.h"
 
-  #include <stdio.h>
+ #include <stdio.h>
 
   int main(void) {
     dk_arena *arena = dka_init(.name = "Main Arena");
@@ -86,16 +86,28 @@ you so choose. The oom handler should ideally exit the program.
   #define DKA_STRING_BUILDER
 #endif // DKA_GIMME_ALL_DEC
 
+#ifdef DKA_STRING_BUILDER_IMPLEMENTATION
+  #define DKA_STRING_BUILDER
+  #define DKA_DYNAMIC_ARRAY_IMPLEMENTATION
+#endif // DKA_STRING_BUILDER_IMPLEMENTATION
+
+#ifdef DKA_DYNAMIC_ARRAY_IMPLEMENTATION
+  #define DKA_DYNAMIC_ARRAY
+  #define DKA_IMPLEMENTATION
+#endif // DKA_DYNAMIC_ARRAY_IMPLEMENTATION
+
+#ifdef DKA_STRING_BUILDER
+  #define DKA_DYNAMIC_ARRAY
+#endif // DKA_STRING_BUILDER
+
 #ifdef DKA_IMPLEMENTATION_MAKE_STATIC
   #define DKA_DEC static inline
   #define DKA_DEF DKA_DEC
-
   #define DKA_IMPLEMENTATION
 
   #ifdef DKA_DYNAMIC_ARRAY
     #define DKA_DYNAMIC_ARRAY_IMPLEMENTATION
   #endif // DKA_DYNAMIC_ARRAY
-
   #ifdef DKA_STRING_BUILDER
     #define DKA_STRING_BUILDER_IMPLEMENTATION
   #endif // DKA_STRING_BUILDER
@@ -104,33 +116,20 @@ you so choose. The oom handler should ideally exit the program.
   #define DKA_DEF
 #endif // DKA_IMPLEMENTATION_MAKE_STATIC
 
-#ifdef DKA_STRING_BUILDER_IMPLEMENTATION
-  #define DKA_STRING_BUILDER
-  #define DKA_DYNAMIC_ARRAY
-#endif // DKA_STRING_BUILDER_IMPLEMENTATION
-
-#ifdef DKA_STRING_BUILDER
-  #define DKA_DYNAMIC_ARRAY
-#endif // DKA_STRING_BUILDER
-
-#ifdef DKA_DYNAMIC_ARRAY_IMPLEMENTATION
-  #define DKA_DYNAMIC_ARRAY
-#endif // DKA_DYNAMIC_ARRAY_IMPLEMENTATION
-
 #ifndef DK_ARENA_H_
 #define DK_ARENA_H_
 
 #ifdef __linux__
-  #include <sys/mman.h>
-  #include <unistd.h>
+ #include <sys/mman.h>
+ #include <unistd.h>
 #elif defined(_WIN32)
-  #ifndef WIN32_LEAN_AND_MEAN
-    #define WIN32_LEAN_AND_MEAN
-  #endif // WIN32_LEAN_AND_MEAN
+ #ifndef WIN32_LEAN_AND_MEAN
+   #define WIN32_LEAN_AND_MEAN
+ #endif // WIN32_LEAN_AND_MEAN
 
-  #include <windows.h>
+ #include <windows.h>
 #else
-  #error "Unsupported Operating System"
+ #error "Unsupported Operating System"
 #endif // OPERATING SYSTEM
 
 #include <stdalign.h>
@@ -200,6 +199,7 @@ typedef struct {
 DKA_DEC void dka_oom_handler(dk_arena *, size_t);
 DKA_DEC void dka_delete(dk_arena *);
 DKA_DEC void dka_rewind(dk_arena *, size_t);
+DKA_DEC void *dka_memdup(dk_arena *, const void *, size_t);
 
 DKA_DEC dk_arena *impl_dka__initialization(dka__params);
 DKA_DEC void *impl_dka__allocation(dk_arena *, dka__params, size_t, bool);
@@ -221,8 +221,8 @@ DKA_DEC bool impl_dka__sys_mem_release(void *, size_t);
 DKA_DEF void dka_oom_handler(dk_arena *arena, size_t requested_size) {
   fprintf(stderr,
           "[dk_arena%s%s] OUT OF MEMORY\n"
-          " | Attempted to allocate: %zu bytes\n"
-          " | Remaining capacity   : %zu bytes\n",
+          " | Attempted to allocate : %zu bytes\n"
+          " | Remaining capacity    : %zu bytes\n",
           (arena->name) ? ": " : "",
           (arena->name) ? arena->name : "",
           requested_size,
@@ -242,6 +242,20 @@ DKA_DEF void dka_rewind(dk_arena *arena, size_t pos) {
     arena->pos = new_pos;
   }
 } /* dka_rewind() */
+
+DKA_DEF void *dka_memdup(dk_arena *arena, const void *src, size_t bytes) {
+  if ((!arena) || (!src) || (!bytes)) return NULL;
+  else if (bytes > (arena->reserve - arena->pos)) goto error_oom;
+
+  void *dest = dka_alloc(arena, bytes);
+  if (!dest) return NULL;
+
+  return memcpy(dest, src, bytes);
+
+error_oom:
+  arena->handle_oom(arena, bytes);
+  return NULL;
+} /* dka_memdup() */
 
 DKA_DEF dk_arena *impl_dka__initialization(dka__params params) {
   if (!params.reserve_size) params.reserve_size = DKA_GiB(1);
@@ -314,11 +328,11 @@ error_oom:
 
 DKA_DEF void *impl_dka__callocation(dk_arena *arena, dka__params params, size_t count, size_t size) {
   if (!arena) return NULL;
-  if ((size) && (count > SIZE_MAX / size)) goto error_oom;
+  if ((size) && (count > (arena->reserve - arena->pos) / size)) goto error_oom;
   return impl_dka__allocation(arena, params, count * size, true);
 
 error_oom:
-  arena->handle_oom(arena, SIZE_MAX);
+  arena->handle_oom(arena, count * size);
   return NULL;
 } /* impl_dka__callocation */
 
@@ -350,7 +364,7 @@ DKA_DEF void *impl_dka__reallocation(dk_arena *arena, dka__params params, void *
   }
 
   void *new_ptr = impl_dka__allocation(arena, params, new_size, false);
-  if (new_ptr) memcpy(new_ptr, ptr, old_size);
+  if (new_ptr) memcpy(new_ptr, ptr, (new_size < old_size) ? new_size : old_size);
   return new_ptr;
 } /* impl_dka__reallocation() */
 
@@ -417,53 +431,6 @@ DKA_DEF bool impl_dka__sys_mem_release(void *ptr, size_t size) {
 
 #endif // DKA_IMPLEMENTATION
 
-#if defined(DKA_STRING_BUILDER) && !defined(DKA_STRING_BUILDER_GUARD)
-#define DKA_STRING_BUILDER_GUARD
-
-#include <ctype.h>
-
-typedef char *dksb; // string builder
-
-typedef struct {
-  uint8_t dummy;   // dummy field for initialization
-  bool ignore_ord; // default: false
-} dksb__params;
-
-#define DKA_IS_PTR(x)                                                                                                  \
-  _Generic(&(x), char **: true, const char **: true, char *const *: true, const char *const *: true, default: false)
-#define DKA_STRLEN(str) (DKA_IS_PTR(str) ? strlen(str) : (sizeof(str) - 1))
-
-#define dksb_build(arena, str)                impl_dksb__build((arena), (str), DKA_STRLEN(str))
-#define dksb_build_wlen(arena, str, len)      impl_dksb__build((arena), (str), (len))
-#define dksb_strdup(arena, sb)                impl_dksb__build((arena), (sb), dksb_strlen(sb))
-#define dksb_null_terminate(arena, sb)        impl_dksb__push_null((arena), &(sb))
-#define dksb_tolower(sb)                      impl_dksb__letter_case_shift(&(sb), true)
-#define dksb_toupper(sb)                      impl_dksb__letter_case_shift(&(sb), false)
-#define dksb_insert(arena, sb, c, n)          impl_dksb__insertion((arena), &(sb), (c), (n))
-#define dksb_append(arena, sb, c)             impl_dksb__insertion((arena), &(sb), (c), dksb_strlen(sb))
-#define dksb_concat(arena, sb, str)           impl_dksb__concatenation((arena), &(sb), (str), DKA_STRLEN(str))
-#define dksb_concat_wlen(arena, sb, str, len) impl_dksb__concatenation((arena), &(sb), (str), (len))
-#define dksb_remove(sb, n, ...)               impl_dksb__removal(&(sb), (n), (dksb__params){.dummy = 0, ##__VA_ARGS__})
-#define dksb_reverse(sb)                      impl_dksb__reversal(&(sb))
-#define dksb_clear(sb) (void)(((sb)) ? (((dkda_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
-
-DKA_DEC size_t dksb_strlen(dksb);
-DKA_DEC bool dksb_isempty(dksb);
-DKA_DEC bool dksb_equals(dksb, dksb);
-DKA_DEC bool dksb_equals_ic(dksb, dksb);
-DKA_DEC int dksb_compare(dksb, dksb);
-
-DKA_DEC dksb impl_dksb__build(dk_arena *, const char *, size_t len);
-DKA_DEC bool impl_dksb__push_null(dk_arena *, dksb *);
-DKA_DEC bool impl_dksb__pop_null(dksb *);
-DKA_DEC bool impl_dksb__letter_case_shift(dksb *, bool);
-DKA_DEC bool impl_dksb__insertion(dk_arena *, dksb *, char, size_t);
-DKA_DEC bool impl_dksb__concatenation(dk_arena *, dksb *, const char *, size_t);
-DKA_DEC bool impl_dksb__removal(dksb *, size_t, dksb__params);
-DKA_DEC bool impl_dksb__reversal(dksb *);
-
-#endif // DKA_STRING_BUILDER
-
 #if defined(DKA_DYNAMIC_ARRAY) && !defined(DKA_DYNAMIC_ARRAY_GUARD)
 #define DKA_DYNAMIC_ARRAY_GUARD
 
@@ -477,7 +444,7 @@ typedef union {
   max_align_t align;
 } dkda_header;
 
-#define DYNAMIC_ARRAY_INIT_CAPACITY (8)
+#define DKDA_INITIAL_CAPACITY (8)
 
 #define dkda_init(arena, type, size) impl_dkda__initialization((arena), sizeof(type), (size))
 #define dkda_len(arr)                ((arr) ? ((dkda_header *)(arr) - 1)->data.count : 0)
@@ -485,6 +452,7 @@ typedef union {
 #define dkda_last(arr)               ((arr)[dkda_len(arr) - 1])
 #define dkda_pop(arr)                (void)(((arr) && (dkda_len(arr))) ? --((dkda_header *)(arr) - 1)->data.count : 0)
 #define dkda_clear(arr)              (void)(((arr)) ? (((dkda_header *)(arr) - 1)->data.count = 0) : 0)
+#define dkda_memdup(arena, src)      impl_dkda__memdup((arena), (src), sizeof(*(src)))
 
 #define dkda_insert(arena, arr, n, element)                                                                            \
   ({                                                                                                                   \
@@ -618,11 +586,136 @@ typedef union {
     fputc('\n', (stream));                                                                                             \
   } while (false)
 
+DKA_DEC void *impl_dkda__memdup(dk_arena *, const void *, size_t);
 DKA_DEC void *impl_dkda__initialization(dk_arena *, size_t, size_t);
 DKA_DEC void *impl_dkda__growth(dk_arena *, void *, size_t);
 DKA_DEC void *impl_dkda__reservation(dk_arena *, void *, size_t, size_t);
 
 #endif // DKA_DYNAMIC_ARRAY
+
+#if defined(DKA_DYNAMIC_ARRAY_IMPLEMENTATION) && !defined(DKA_DYNAMIC_ARRAY_IMPLEMENTATION_GUARD)
+#define DKA_DYNAMIC_ARRAY_IMPLEMENTATION_GUARD
+
+static inline bool hlpr_dkda__overflow(size_t elem_size, size_t count, size_t *out) {
+  size_t body;
+  if (__builtin_mul_overflow(elem_size, count, &body)) return true;
+  return __builtin_add_overflow(body, sizeof(dkda_header), out);
+} /* hlpr_dkda__overflow() */
+
+DKA_DEF void *impl_dkda__memdup(dk_arena *arena, const void *src, size_t elem_size) {
+  if ((!arena) || (!src) || (!elem_size)) return NULL;
+
+  size_t src_len = dkda_len(src);
+  void *dest = impl_dkda__initialization(arena, elem_size, src_len);
+  if (!dest) return NULL;
+
+  if (src_len > 0) memcpy(dest, src, src_len * elem_size);
+  ((dkda_header *)dest - 1)->data.count = src_len;
+  return dest;
+}
+
+DKA_DEF void *impl_dkda__initialization(dk_arena *arena, size_t elem_size, size_t count) {
+  if ((!arena) || (!elem_size)) return NULL;
+
+  size_t bytes;
+  if (hlpr_dkda__overflow(elem_size, count, &bytes)) goto error_oom;
+
+  dkda_header *header = dka_alloc(arena, bytes);
+  if (!header) return NULL;
+
+  header->data.count = 0;
+  header->data.cap = count;
+
+  return header + 1;
+
+error_oom:
+  arena->handle_oom(arena, SIZE_MAX);
+  return NULL;
+} /* impl_dkda__initialization() */
+
+DKA_DEF void *impl_dkda__growth(dk_arena *arena, void *arr, size_t elem_size) {
+  if ((!arena) || (!elem_size)) return NULL;
+  if (!arr) return impl_dkda__initialization(arena, elem_size, DKDA_INITIAL_CAPACITY);
+
+  dkda_header *header = (dkda_header *)arr - 1;
+  size_t new_cap = DKDA_INITIAL_CAPACITY;
+  if ((header->data.cap) && (__builtin_mul_overflow(header->data.cap, (size_t)2, &new_cap))) goto error_oom;
+
+  return impl_dkda__reservation(arena, arr, elem_size, new_cap);
+
+error_oom:
+  arena->handle_oom(arena, SIZE_MAX);
+  return NULL;
+} /* impl_dkda__growth() */
+
+DKA_DEF void *impl_dkda__reservation(dk_arena *arena, void *arr, size_t elem_size, size_t size) {
+  if ((!arena) || (!size) || (!elem_size)) return NULL;
+  if (!arr) return impl_dkda__initialization(arena, elem_size, size);
+
+  dkda_header *header = (dkda_header *)arr - 1;
+  if (header->data.cap >= size) return arr;
+
+  size_t old_size, new_size;
+  if (hlpr_dkda__overflow(elem_size, header->data.cap, &old_size)) goto error_oom;
+  else if (hlpr_dkda__overflow(elem_size, size, &new_size)) goto error_oom;
+
+  dkda_header *new_header = dka_realloc(arena, header, old_size, new_size);
+  if (!new_header) return NULL;
+
+  header = new_header;
+  header->data.cap = size;
+
+  return header + 1;
+
+error_oom:
+  arena->handle_oom(arena, SIZE_MAX);
+  return NULL;
+} /* impl_dkda__reservation() */
+
+#endif // DKA_DYNAMIC_ARRAY_IMPLEMENTATION
+
+#if defined(DKA_STRING_BUILDER) && !defined(DKA_STRING_BUILDER_GUARD)
+#define DKA_STRING_BUILDER_GUARD
+
+#include <ctype.h>
+
+typedef char *dksb; // string builder
+
+typedef struct {
+  uint8_t dummy;   // dummy field for initialization
+  bool ignore_ord; // default: false
+} dksb__params;
+
+#define dksb_build(arena, str)           ((str) ? impl_dksb__build((arena), (str), strlen(str)) : NULL)
+#define dksb_build_wlen(arena, str, len) impl_dksb__build((arena), (str), (len))
+#define dksb_strdup(arena, sb)           impl_dksb__build((arena), (sb), dksb_strlen(sb))
+#define dksb_null_terminate(arena, sb)   impl_dksb__push_null((arena), &(sb))
+#define dksb_tolower(sb)                 impl_dksb__letter_case_shift(&(sb), true)
+#define dksb_toupper(sb)                 impl_dksb__letter_case_shift(&(sb), false)
+#define dksb_insert(arena, sb, c, n)     impl_dksb__insertion((arena), &(sb), (c), (n))
+#define dksb_append(arena, sb, c)        impl_dksb__insertion((arena), &(sb), (c), dksb_strlen(sb))
+#define dksb_concat(arena, sb, str)      ((str) ? impl_dksb__concatenation((arena), &(sb), (str), strlen(str)) : false)
+#define dksb_concat_wlen(arena, sb, str, len) impl_dksb__concatenation((arena), &(sb), (str), (len))
+#define dksb_remove(sb, n, ...)               impl_dksb__removal(&(sb), (n), (dksb__params){.dummy = 0, ##__VA_ARGS__})
+#define dksb_reverse(sb)                      impl_dksb__reversal(&(sb))
+#define dksb_clear(sb) (void)(((sb)) ? (((dkda_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
+
+DKA_DEC size_t dksb_strlen(dksb);
+DKA_DEC bool dksb_isempty(dksb);
+DKA_DEC bool dksb_equals(dksb, dksb);
+DKA_DEC bool dksb_equals_ic(dksb, dksb);
+DKA_DEC int dksb_compare(dksb, dksb);
+
+DKA_DEC dksb impl_dksb__build(dk_arena *, const char *, size_t len);
+DKA_DEC bool impl_dksb__push_null(dk_arena *, dksb *);
+DKA_DEC bool impl_dksb__pop_null(dksb *);
+DKA_DEC bool impl_dksb__letter_case_shift(dksb *, bool);
+DKA_DEC bool impl_dksb__insertion(dk_arena *, dksb *, char, size_t);
+DKA_DEC bool impl_dksb__concatenation(dk_arena *, dksb *, const char *, size_t);
+DKA_DEC bool impl_dksb__removal(dksb *, size_t, dksb__params);
+DKA_DEC bool impl_dksb__reversal(dksb *);
+
+#endif // DKA_STRING_BUILDER
 
 #if defined(DKA_STRING_BUILDER_IMPLEMENTATION) && !defined(DKA_STRING_BUILDER_IMPLEMENTATION_GUARD)
 #define DKA_STRING_BUILDER_IMPLEMENTATION_GUARD
@@ -676,7 +769,7 @@ DKA_DEF int dksb_compare(dksb a, dksb b) {
 } /* dksb_compare() */
 
 DKA_DEF dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len) {
-  if ((!arena) || (!str)) return NULL;
+  if (!arena) return NULL;
   dksb sb = impl_dkda__initialization(arena, sizeof(char), len + 1);
   if (!sb) return NULL;
 
@@ -688,7 +781,7 @@ DKA_DEF dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len) {
 } /* impl_dksb__build() */
 
 DKA_DEF bool impl_dksb__push_null(dk_arena *arena, dksb *sb) {
-  if (!sb) return false;
+  if ((!arena) || (!sb)) return false;
   if (!(*sb)) return false;
 
   size_t len = dkda_len(*sb);
@@ -723,7 +816,7 @@ DKA_DEF bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower) {
 } /* impl_dksb__letter_case_shift() */
 
 DKA_DEF bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n) {
-  if (!sb) return false;
+  if ((!arena) || (!sb)) return false;
   if (!(*sb)) return false;
   impl_dksb__pop_null(sb);
 
@@ -752,20 +845,23 @@ DKA_DEF bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n) {
 } /* impl_dksb__insertion() */
 
 DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, size_t b_len) {
-  if ((!a) || (!b)) return false;
+  if ((!arena) || (!a)) return false;
   if (!(*a)) return false;
   if (b_len == 0) return true;
 
   size_t a_len = dksb_strlen(*a);
 
-  if (SIZE_MAX - a_len - 1 < b_len) return false;
+  size_t requested_size;
+  if (__builtin_add_overflow(a_len, b_len, &requested_size)) goto error_oom;
+  else if (__builtin_add_overflow(requested_size, (size_t)1, &requested_size)) goto error_oom;
 
   size_t a_cap = dkda_cap(*a);
   impl_dksb__pop_null(a);
-  size_t requested_size = a_len + b_len + 1;
 
   if (requested_size > a_cap) {
-    size_t new_cap = requested_size > a_cap * 2 ? requested_size : a_cap * 2;
+    size_t new_cap;
+    if ((__builtin_mul_overflow(a_cap, (size_t)2, &new_cap)) || (new_cap < requested_size)) new_cap = requested_size;
+
     char *tmp = impl_dkda__reservation(arena, (*a), sizeof(char), new_cap);
     if (!tmp) {
       impl_dksb__push_null(arena, a);
@@ -778,6 +874,10 @@ DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, s
   ((dkda_header *)(*a) - 1)->data.count += b_len;
 
   return impl_dksb__push_null(arena, a);
+
+error_oom:
+  arena->handle_oom(arena, SIZE_MAX);
+  return false;
 } /* impl_dksb__concatenation() */
 
 DKA_DEF bool impl_dksb__removal(dksb *sb, size_t n, dksb__params params) {
@@ -826,55 +926,6 @@ DKA_DEF bool impl_dksb__reversal(dksb *sb) {
 } /* impl_dksb__reversal() */
 
 #endif // DKA_STRING_BUILDER_IMPLEMENTATION
-
-#if defined(DKA_DYNAMIC_ARRAY_IMPLEMENTATION) && !defined(DKA_DYNAMIC_ARRAY_IMPLEMENTATION_GUARD)
-#define DKA_DYNAMIC_ARRAY_IMPLEMENTATION_GUARD
-
-DKA_DEF void *impl_dkda__initialization(dk_arena *arena, size_t elem_size, size_t count) {
-  if (!elem_size) return NULL;
-  if (count > (SIZE_MAX - sizeof(dkda_header)) / elem_size) return NULL;
-
-  dkda_header *header = dka_alloc(arena, sizeof(dkda_header) + (elem_size * count));
-  if (!header) return NULL;
-
-  header->data.count = 0;
-  header->data.cap = count;
-
-  return header + 1;
-} /* impl_dkda__initialization() */
-
-DKA_DEF void *impl_dkda__growth(dk_arena *arena, void *arr, size_t elem_size) {
-  if (!elem_size) return NULL;
-  if (!arr) return impl_dkda__initialization(arena, elem_size, DYNAMIC_ARRAY_INIT_CAPACITY);
-
-  dkda_header *header = (dkda_header *)arr - 1;
-  if (header->data.cap > SIZE_MAX / 2) return NULL;
-  size_t new_cap = (header->data.cap) ? header->data.cap * 2 : DYNAMIC_ARRAY_INIT_CAPACITY;
-
-  return impl_dkda__reservation(arena, arr, elem_size, new_cap);
-} /* impl_dkda__growth() */
-
-DKA_DEF void *impl_dkda__reservation(dk_arena *arena, void *arr, size_t elem_size, size_t size) {
-  if ((!size) || (!elem_size)) return NULL;
-  if (!arr) return impl_dkda__initialization(arena, elem_size, size);
-
-  dkda_header *header = (dkda_header *)arr - 1;
-  if (header->data.cap >= size) return arr;
-  if (size > (SIZE_MAX - sizeof(dkda_header)) / elem_size) return NULL;
-
-  size_t old_size = sizeof(dkda_header) + (elem_size * header->data.cap);
-  size_t new_size = sizeof(dkda_header) + (elem_size * size);
-
-  dkda_header *new_header = dka_realloc(arena, header, old_size, new_size);
-  if (!new_header) return NULL;
-
-  header = new_header;
-  header->data.cap = size;
-
-  return header + 1;
-} /* impl_dkda__reservation() */
-
-#endif // DKA_DYNAMIC_ARRAY_IMPLEMENTATION
 
 /*
 ------------------------------------------------------------------------------
