@@ -1,3 +1,5 @@
+#define DKA_GIMME_ALL
+
 /*
 # `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for virtual memory arenas. See end of file for license information.
@@ -813,9 +815,9 @@ DKA_DEF bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower) {
   if (dksb_isempty(*sb)) return false;
 
   size_t len = dksb_strlen(*sb);
+  char *str = (*sb);
   for (size_t n = 0; n < len; n++) {
-    if (to_lower) (*sb)[n] = tolower((unsigned char)(*sb)[n]);
-    else (*sb)[n] = toupper((unsigned char)(*sb)[n]);
+    str[n] = (char)((to_lower) ? tolower((unsigned char)str[n]) : toupper((unsigned char)str[n]));
   }
 
   return true;
