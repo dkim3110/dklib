@@ -198,36 +198,36 @@ typedef struct {
        dka_snapshot__complete = NULL, dka_drop_snapshot(dka_snapshot__tmp))                                            \
     for (bool dka_snapshot__done = false; !dka_snapshot__done; dka_snapshot__done = true)
 
-DKA_DEC void dka_oom_handler(dk_arena *, size_t);
-DKA_DEC void dka_delete(dk_arena *);
-DKA_DEC void dka_rewind(dk_arena *, size_t);
-DKA_DEC void *dka_memdup(dk_arena *, const void *, size_t);
+DKA_DEC void dka_oom_handler(dk_arena *arena, size_t rq_size);
+DKA_DEC void dka_delete(dk_arena *arena);
+DKA_DEC void dka_rewind(dk_arena *arena, size_t pos);
+DKA_DEC void *dka_memdup(dk_arena *arena, const void *src, size_t bytes);
 
-DKA_DEC dk_arena *impl_dka__initialization(dka__params);
-DKA_DEC void *impl_dka__allocation(dk_arena *, dka__params, size_t, bool);
-DKA_DEC void *impl_dka__callocation(dk_arena *, dka__params, size_t, size_t);
-DKA_DEC void *impl_dka__reallocation(dk_arena *, dka__params, void *, size_t, size_t);
-DKA_DEC void impl_dka__resetting(dk_arena *, bool);
+DKA_DEC dk_arena *impl_dka__initialization(dka__params params);
+DKA_DEC void *impl_dka__allocation(dk_arena *arena, dka__params params, size_t size, bool zero_out);
+DKA_DEC void *impl_dka__callocation(dk_arena *arena, dka__params params, size_t count, size_t size);
+DKA_DEC void *impl_dka__reallocation(dk_arena *arena, dka__params params, void *ptr, size_t old_size, size_t new_size);
+DKA_DEC void impl_dka__resetting(dk_arena *arena, bool do_decommit);
 
 DKA_DEC uint32_t impl_dka__sys_get_pagesize(void);
-DKA_DEC void *impl_dka__sys_mem_reserve(size_t);
-DKA_DEC bool impl_dka__sys_mem_commit(void *, size_t);
-DKA_DEC bool impl_dka__sys_mem_decommit(void *, size_t);
-DKA_DEC bool impl_dka__sys_mem_release(void *, size_t);
+DKA_DEC void *impl_dka__sys_mem_reserve(size_t size);
+DKA_DEC bool impl_dka__sys_mem_commit(void *ptr, size_t size);
+DKA_DEC bool impl_dka__sys_mem_decommit(void *ptr, size_t size);
+DKA_DEC bool impl_dka__sys_mem_release(void *ptr, size_t size);
 
 #endif // DK_ARENA_H_
 
 #if defined(DKA_IMPLEMENTATION) && !defined(DKA_IMPLEMENTATION_GUARD)
 #define DKA_IMPLEMENTATION_GUARD
 
-DKA_DEF void dka_oom_handler(dk_arena *arena, size_t requested_size) {
+DKA_DEF void dka_oom_handler(dk_arena *arena, size_t rq_size) {
   fprintf(stderr,
           "[dk_arena%s%s] OUT OF MEMORY\n"
           " | Attempted to allocate : %zu bytes\n"
           " | Remaining capacity    : %zu bytes\n",
           (arena->name) ? ": " : "",
           (arena->name) ? arena->name : "",
-          requested_size,
+          rq_size,
           (arena->reserve - arena->pos));
 
   exit(EXIT_FAILURE);
@@ -586,10 +586,10 @@ typedef union {
     fputc('\n', (stream));                                                                                             \
   } while (false)
 
-DKA_DEC void *impl_dkda__memdup(dk_arena *, const void *, size_t);
-DKA_DEC void *impl_dkda__initialization(dk_arena *, size_t, size_t);
-DKA_DEC void *impl_dkda__growth(dk_arena *, void *, size_t);
-DKA_DEC void *impl_dkda__reservation(dk_arena *, void *, size_t, size_t);
+DKA_DEC void *impl_dkda__memdup(dk_arena *arena, const void *src, size_t elem_size);
+DKA_DEC void *impl_dkda__initialization(dk_arena *arena, size_t elem_size, size_t count);
+DKA_DEC void *impl_dkda__growth(dk_arena *arena, void *arr, size_t elem_size);
+DKA_DEC void *impl_dkda__reservation(dk_arena *arena, void *arr, size_t elem_size, size_t size);
 
 #endif // DKA_DYNAMIC_ARRAY
 
@@ -700,20 +700,20 @@ typedef struct {
 #define dksb_reverse(sb)                      impl_dksb__reversal(&(sb))
 #define dksb_clear(sb) (void)(((sb)) ? (((dkda_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
 
-DKA_DEC size_t dksb_strlen(dksb);
-DKA_DEC bool dksb_isempty(dksb);
-DKA_DEC bool dksb_equals(dksb, dksb);
-DKA_DEC bool dksb_equals_ic(dksb, dksb);
-DKA_DEC int dksb_compare(dksb, dksb);
+DKA_DEC size_t dksb_strlen(dksb sb);
+DKA_DEC bool dksb_isempty(dksb sb);
+DKA_DEC bool dksb_equals(dksb a, dksb b);
+DKA_DEC bool dksb_equals_ic(dksb a, dksb b);
+DKA_DEC int dksb_compare(dksb a, dksb b);
 
-DKA_DEC dksb impl_dksb__build(dk_arena *, const char *, size_t len);
-DKA_DEC bool impl_dksb__push_null(dk_arena *, dksb *);
-DKA_DEC bool impl_dksb__pop_null(dksb *);
-DKA_DEC bool impl_dksb__letter_case_shift(dksb *, bool);
-DKA_DEC bool impl_dksb__insertion(dk_arena *, dksb *, char, size_t);
-DKA_DEC bool impl_dksb__concatenation(dk_arena *, dksb *, const char *, size_t);
-DKA_DEC bool impl_dksb__removal(dksb *, size_t, dksb__params);
-DKA_DEC bool impl_dksb__reversal(dksb *);
+DKA_DEC dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len);
+DKA_DEC bool impl_dksb__push_null(dk_arena *arena, dksb *sb);
+DKA_DEC bool impl_dksb__pop_null(dksb *sb);
+DKA_DEC bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower);
+DKA_DEC bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n);
+DKA_DEC bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, size_t b_len);
+DKA_DEC bool impl_dksb__removal(dksb *sb, size_t n, dksb__params params);
+DKA_DEC bool impl_dksb__reversal(dksb *sb);
 
 #endif // DKA_STRING_BUILDER
 
@@ -857,16 +857,16 @@ DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, s
 
   size_t a_len = dksb_strlen(*a);
 
-  size_t requested_size;
-  if (__builtin_add_overflow(a_len, b_len, &requested_size)) goto error_oom;
-  else if (__builtin_add_overflow(requested_size, (size_t)1, &requested_size)) goto error_oom;
+  size_t rq_size;
+  if (__builtin_add_overflow(a_len, b_len, &rq_size)) goto error_oom;
+  else if (__builtin_add_overflow(rq_size, (size_t)1, &rq_size)) goto error_oom;
 
   size_t a_cap = dkda_cap(*a);
   impl_dksb__pop_null(a);
 
-  if (requested_size > a_cap) {
+  if (rq_size > a_cap) {
     size_t new_cap;
-    if ((__builtin_mul_overflow(a_cap, (size_t)2, &new_cap)) || (new_cap < requested_size)) new_cap = requested_size;
+    if ((__builtin_mul_overflow(a_cap, (size_t)2, &new_cap)) || (new_cap < rq_size)) new_cap = rq_size;
 
     char *tmp = impl_dkda__reservation(arena, (*a), sizeof(char), new_cap);
     if (!tmp) {

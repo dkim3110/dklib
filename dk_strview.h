@@ -69,45 +69,45 @@ typedef struct {
   #define dksb_to_dksv(sb) dksv_view_wlen((sb), dksb_strlen(sb))
 #endif // DKA_STRING_BUILDER_GUARD
 
-DKSV_DEC bool dksv_isempty(dksv);
-DKSV_DEC bool dksv_isblank(dksv);
-DKSV_DEC bool dksv_equals(dksv, dksv);
-DKSV_DEC bool dksv_ic_equals(dksv, dksv);
-DKSV_DEC int dksv_cmp(dksv, dksv);
-DKSV_DEC bool dksv_isalpha(dksv);
-DKSV_DEC bool dksv_isalnum(dksv);
-DKSV_DEC bool dksv_isdigit(dksv);
+DKSV_DEC bool dksv_isempty(dksv sv);
+DKSV_DEC bool dksv_isblank(dksv sv);
+DKSV_DEC bool dksv_equals(dksv a, dksv b);
+DKSV_DEC bool dksv_ic_equals(dksv a, dksv b);
+DKSV_DEC int dksv_cmp(dksv a, dksv b);
+DKSV_DEC bool dksv_isalpha(dksv sv);
+DKSV_DEC bool dksv_isalnum(dksv sv);
+DKSV_DEC bool dksv_isdigit(dksv sv);
 
-DKSV_DEC void dksv_fput(dksv, FILE *);
-DKSV_DEC void dksv_print(dksv);
-DKSV_DEC void dksv_println(dksv);
+DKSV_DEC void dksv_fput(dksv sv, FILE *stream);
+DKSV_DEC void dksv_print(dksv sv);
+DKSV_DEC void dksv_println(dksv sv);
 
-DKSV_DEC dksv dksv_take(dksv, size_t);
-DKSV_DEC dksv dksv_drop(dksv, size_t);
-DKSV_DEC dksv dksv_sub(dksv, size_t, size_t);
-DKSV_DEC dksv dksv_split(dksv *, char);
-DKSV_DEC dksv dksv_split_ws(dksv *);
+DKSV_DEC dksv dksv_take(dksv sv, size_t n);
+DKSV_DEC dksv dksv_drop(dksv sv, size_t n);
+DKSV_DEC dksv dksv_sub(dksv sv, size_t start, size_t end);
+DKSV_DEC dksv dksv_split(dksv *sv, char delimiter);
+DKSV_DEC dksv dksv_split_ws(dksv *sv);
 
-DKSV_DEC dksv dksv_trim(dksv);
-DKSV_DEC dksv dksv_ltrim(dksv);
-DKSV_DEC dksv dksv_rtrim(dksv);
-DKSV_DEC dksv dksv_trimc(dksv, char);
-DKSV_DEC dksv dksv_ltrimc(dksv, char);
-DKSV_DEC dksv dksv_rtrimc(dksv, char);
+DKSV_DEC dksv dksv_trim(dksv sv);
+DKSV_DEC dksv dksv_ltrim(dksv sv);
+DKSV_DEC dksv dksv_rtrim(dksv sv);
+DKSV_DEC dksv dksv_trimc(dksv sv, char c);
+DKSV_DEC dksv dksv_ltrimc(dksv sv, char c);
+DKSV_DEC dksv dksv_rtrimc(dksv sv, char c);
 
-DKSV_DEC bool dksv_prefix(dksv, dksv);
-DKSV_DEC bool dksv_suffix(dksv, dksv);
-DKSV_DEC bool dksv_ic_prefix(dksv, dksv);
-DKSV_DEC bool dksv_ic_suffix(dksv, dksv);
-DKSV_DEC bool dksv_contains(dksv, dksv);
-DKSV_DEC int64_t idx_dksv_contains(dksv, dksv);
-DKSV_DEC int64_t dksv_idx(dksv, char);
-DKSV_DEC int64_t dksv_idx_last(dksv, char);
-DKSV_DEC int32_t dksv_char_at(dksv, size_t);
-DKSV_DEC size_t dksv_count_char(dksv, char);
+DKSV_DEC bool dksv_prefix(dksv base, dksv prefix);
+DKSV_DEC bool dksv_suffix(dksv base, dksv suffix);
+DKSV_DEC bool dksv_ic_prefix(dksv base, dksv prefix);
+DKSV_DEC bool dksv_ic_suffix(dksv base, dksv suffix);
+DKSV_DEC bool dksv_contains(dksv base, dksv item);
+DKSV_DEC int64_t idx_dksv_contains(dksv base, dksv item);
+DKSV_DEC int64_t dksv_idx(dksv sv, char c);
+DKSV_DEC int64_t dksv_idx_last(dksv sv, char c);
+DKSV_DEC int32_t dksv_char_at(dksv sv, size_t index);
+DKSV_DEC size_t dksv_count_char(dksv sv, char c);
 
-DKSV_DEC dksv dksv_view_wlen(const char *, size_t);
-DKSV_DEC double dksv_to_dbl(dksv);
+DKSV_DEC dksv dksv_view_wlen(const char *string, size_t len);
+DKSV_DEC double dksv_to_dbl(dksv sv);
 
 #endif // DK_STR_VIEW_H_
 
