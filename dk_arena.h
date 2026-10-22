@@ -177,13 +177,12 @@ typedef struct {
 
 #define dka_init(...) impl_dka__initialization((dka__params){.dummy = 0, ##__VA_ARGS__})
 
-#define dka_alloc(arena, size, ...)                                                                                    \
-  impl_dka__allocation((arena), (dka__params){.dummy = 0, ##__VA_ARGS__}, (size), false)
+#define dka_alloc(arena, size, ...) impl_dka__allocation((arena), (dka__params){.dummy = 0, ##__VA_ARGS__}, (size), false)
 
-#define dka_calloc(arena, count, size, ...)                                                                            \
+#define dka_calloc(arena, count, size, ...)                                                                                      \
   impl_dka__callocation((arena), (dka__params){.dummy = 0, ##__VA_ARGS__}, (count), (size))
 
-#define dka_realloc(arena, ptr, oldsz, newsz, ...)                                                                     \
+#define dka_realloc(arena, ptr, oldsz, newsz, ...)                                                                               \
   impl_dka__reallocation((arena), (dka__params){.dummy = 0, ##__VA_ARGS__}, (ptr), (oldsz), (newsz))
 
 #define dka_clear(arena) impl_dka__resetting((arena), false)
@@ -192,10 +191,9 @@ typedef struct {
 #define dka_take_snapshot(a)        ((dka_temp){.arena = (a), .pos = (a)->pos})
 #define dka_drop_snapshot(dka_temp) dka_rewind((dka_temp).arena, (dka_temp).pos)
 
-#define dka_snapshot(a)                                                                                                \
-  for (dka_temp dka_snapshot__tmp = dka_take_snapshot(a), *dka_snapshot__complete = &dka_snapshot__tmp;                \
-       dka_snapshot__complete;                                                                                         \
-       dka_snapshot__complete = NULL, dka_drop_snapshot(dka_snapshot__tmp))                                            \
+#define dka_snapshot(a)                                                                                                          \
+  for (dka_temp dka_snapshot__tmp = dka_take_snapshot(a), *dka_snapshot__complete = &dka_snapshot__tmp; dka_snapshot__complete;  \
+       dka_snapshot__complete = NULL, dka_drop_snapshot(dka_snapshot__tmp))                                                      \
     for (bool dka_snapshot__done = false; !dka_snapshot__done; dka_snapshot__done = true)
 
 DKA_DEC void dka_oom_handler(dk_arena *arena, size_t rq_size);
@@ -456,134 +454,129 @@ typedef union {
 #define dkda_clear(arr)              (void)(((arr)) ? (((dkda_header *)(arr) - 1)->data.count = 0) : 0)
 #define dkda_memdup(arena, src)      impl_dkda__memdup((arena), (src), sizeof(*(src)))
 
-#define dkda_insert(arena, arr, n, element)                                                                            \
-  ({                                                                                                                   \
-  bool dkda_insert__success = false;                                                                                   \
-  size_t dkda_insert__len = dkda_len(arr);                                                                             \
-  size_t dkda_insert__index = (n);                                                                                     \
-                                                                                                                       \
-  if (dkda_insert__index <= dkda_insert__len) {                                                                        \
-    if (!(arr) || (dkda_insert__len >= dkda_cap(arr))) {                                                               \
-      void *dkda_insert__tmp = impl_dkda__growth((arena), (arr), sizeof(*(arr)));                                      \
-      if (dkda_insert__tmp) (arr) = dkda_insert__tmp;                                                                  \
-    }                                                                                                                  \
-    if ((arr) && (dkda_insert__len < dkda_cap(arr))) {                                                                 \
-      if (dkda_insert__index < dkda_insert__len)                                                                       \
-        memmove(&(arr)[dkda_insert__index + 1],                                                                        \
-                &(arr)[dkda_insert__index],                                                                            \
-                (dkda_insert__len - dkda_insert__index) * sizeof(*(arr)));                                             \
-      (arr)[dkda_insert__index] = (element);                                                                           \
-      ((dkda_header *)(arr) - 1)->data.count++;                                                                        \
-      dkda_insert__success = true;                                                                                     \
-    }                                                                                                                  \
-  } else dkda_insert__success = dkda_push((arena), (arr), (element));                                                  \
-  dkda_insert__success;                                                                                                \
+#define dkda_insert(arena, arr, n, element)                                                                                      \
+  ({                                                                                                                             \
+  bool dkda_insert__success = false;                                                                                             \
+  size_t dkda_insert__len = dkda_len(arr);                                                                                       \
+  size_t dkda_insert__index = (n);                                                                                               \
+                                                                                                                                 \
+  if (dkda_insert__index <= dkda_insert__len) {                                                                                  \
+    if (!(arr) || (dkda_insert__len >= dkda_cap(arr))) {                                                                         \
+      void *dkda_insert__tmp = impl_dkda__growth((arena), (arr), sizeof(*(arr)));                                                \
+      if (dkda_insert__tmp) (arr) = dkda_insert__tmp;                                                                            \
+    }                                                                                                                            \
+    if ((arr) && (dkda_insert__len < dkda_cap(arr))) {                                                                           \
+      if (dkda_insert__index < dkda_insert__len)                                                                                 \
+        memmove(                                                                                                                 \
+          &(arr)[dkda_insert__index + 1], &(arr)[dkda_insert__index], (dkda_insert__len - dkda_insert__index) * sizeof(*(arr))); \
+      (arr)[dkda_insert__index] = (element);                                                                                     \
+      ((dkda_header *)(arr) - 1)->data.count++;                                                                                  \
+      dkda_insert__success = true;                                                                                               \
+    }                                                                                                                            \
+  } else dkda_insert__success = dkda_push((arena), (arr), (element));                                                            \
+  dkda_insert__success;                                                                                                          \
   })
 
-#define dkda_rev(arr)                                                                                                  \
-  ({                                                                                                                   \
-  bool dkda_rev__success = false;                                                                                      \
-  if (arr) {                                                                                                           \
-    size_t dkda_rev__len = dkda_len(arr);                                                                              \
-    if (dkda_rev__len > 1) {                                                                                           \
-      dkda_rev__success = true;                                                                                        \
-      __typeof__(arr) dkda_rev__left = (arr);                                                                          \
-      __typeof__(arr) dkda_rev__right = dkda_rev__left + (dkda_rev__len - 1);                                          \
-      for (; dkda_rev__left < dkda_rev__right; dkda_rev__left++, dkda_rev__right--) {                                  \
-        __typeof__(*(arr)) dkda_rev__tmp = (*dkda_rev__left);                                                          \
-        (*dkda_rev__left) = (*dkda_rev__right);                                                                        \
-        (*dkda_rev__right) = dkda_rev__tmp;                                                                            \
-      }                                                                                                                \
-    }                                                                                                                  \
-  }                                                                                                                    \
-  dkda_rev__success;                                                                                                   \
+#define dkda_rev(arr)                                                                                                            \
+  ({                                                                                                                             \
+  bool dkda_rev__success = false;                                                                                                \
+  if (arr) {                                                                                                                     \
+    size_t dkda_rev__len = dkda_len(arr);                                                                                        \
+    if (dkda_rev__len > 1) {                                                                                                     \
+      dkda_rev__success = true;                                                                                                  \
+      __typeof__(arr) dkda_rev__left = (arr);                                                                                    \
+      __typeof__(arr) dkda_rev__right = dkda_rev__left + (dkda_rev__len - 1);                                                    \
+      for (; dkda_rev__left < dkda_rev__right; dkda_rev__left++, dkda_rev__right--) {                                            \
+        __typeof__(*(arr)) dkda_rev__tmp = (*dkda_rev__left);                                                                    \
+        (*dkda_rev__left) = (*dkda_rev__right);                                                                                  \
+        (*dkda_rev__right) = dkda_rev__tmp;                                                                                      \
+      }                                                                                                                          \
+    }                                                                                                                            \
+  }                                                                                                                              \
+  dkda_rev__success;                                                                                                             \
   })
 
-#define dkda_rem(arr, n)                                                                                               \
-  ({                                                                                                                   \
-  bool dkda_rem__success = false;                                                                                      \
-  size_t dkda_rem__index = (n);                                                                                        \
-                                                                                                                       \
-  if (arr) {                                                                                                           \
-    size_t dkda_rem__len = dkda_len(arr);                                                                              \
-    if (dkda_rem__index < dkda_rem__len) {                                                                             \
-      (arr)[dkda_rem__index] = (arr)[dkda_rem__len - 1];                                                               \
-      dkda_pop(arr);                                                                                                   \
-      dkda_rem__success = true;                                                                                        \
-    }                                                                                                                  \
-  }                                                                                                                    \
-  dkda_rem__success;                                                                                                   \
+#define dkda_rem(arr, n)                                                                                                         \
+  ({                                                                                                                             \
+  bool dkda_rem__success = false;                                                                                                \
+  size_t dkda_rem__index = (n);                                                                                                  \
+                                                                                                                                 \
+  if (arr) {                                                                                                                     \
+    size_t dkda_rem__len = dkda_len(arr);                                                                                        \
+    if (dkda_rem__index < dkda_rem__len) {                                                                                       \
+      (arr)[dkda_rem__index] = (arr)[dkda_rem__len - 1];                                                                         \
+      dkda_pop(arr);                                                                                                             \
+      dkda_rem__success = true;                                                                                                  \
+    }                                                                                                                            \
+  }                                                                                                                              \
+  dkda_rem__success;                                                                                                             \
   })
 
-#define dkda_rem_ord(arr, n)                                                                                           \
-  ({                                                                                                                   \
-  bool dkda_rem_ord__success = false;                                                                                  \
-  size_t dkda_rem_ord__index = (n);                                                                                    \
-                                                                                                                       \
-  if (arr) {                                                                                                           \
-    size_t dkda_rem_ord__len = dkda_len(arr);                                                                          \
-    if (dkda_rem_ord__index < dkda_rem_ord__len) {                                                                     \
-      memmove(&(arr)[dkda_rem_ord__index],                                                                             \
-              &(arr)[dkda_rem_ord__index + 1],                                                                         \
-              (dkda_rem_ord__len - dkda_rem_ord__index - 1) * sizeof(*(arr)));                                         \
-      dkda_pop(arr);                                                                                                   \
-      dkda_rem_ord__success = true;                                                                                    \
-    }                                                                                                                  \
-  }                                                                                                                    \
-  dkda_rem_ord__success;                                                                                               \
+#define dkda_rem_ord(arr, n)                                                                                                     \
+  ({                                                                                                                             \
+  bool dkda_rem_ord__success = false;                                                                                            \
+  size_t dkda_rem_ord__index = (n);                                                                                              \
+                                                                                                                                 \
+  if (arr) {                                                                                                                     \
+    size_t dkda_rem_ord__len = dkda_len(arr);                                                                                    \
+    if (dkda_rem_ord__index < dkda_rem_ord__len) {                                                                               \
+      memmove(&(arr)[dkda_rem_ord__index],                                                                                       \
+              &(arr)[dkda_rem_ord__index + 1],                                                                                   \
+              (dkda_rem_ord__len - dkda_rem_ord__index - 1) * sizeof(*(arr)));                                                   \
+      dkda_pop(arr);                                                                                                             \
+      dkda_rem_ord__success = true;                                                                                              \
+    }                                                                                                                            \
+  }                                                                                                                              \
+  dkda_rem_ord__success;                                                                                                         \
   })
 
-#define dkda_push(arena, arr, element)                                                                                 \
-  ({                                                                                                                   \
-  bool dkda_push__success = true;                                                                                      \
-  if (!(arr) || (dkda_len(arr) >= dkda_cap(arr))) {                                                                    \
-    void *dkda_push__tmp = impl_dkda__growth((arena), (arr), sizeof(*(arr)));                                          \
-    if (dkda_push__tmp) (arr) = dkda_push__tmp;                                                                        \
-    else dkda_push__success = false;                                                                                   \
-  }                                                                                                                    \
-  if (dkda_push__success) (arr)[((dkda_header *)(arr) - 1)->data.count++] = (element);                                 \
-  dkda_push__success;                                                                                                  \
+#define dkda_push(arena, arr, element)                                                                                           \
+  ({                                                                                                                             \
+  bool dkda_push__success = true;                                                                                                \
+  if (!(arr) || (dkda_len(arr) >= dkda_cap(arr))) {                                                                              \
+    void *dkda_push__tmp = impl_dkda__growth((arena), (arr), sizeof(*(arr)));                                                    \
+    if (dkda_push__tmp) (arr) = dkda_push__tmp;                                                                                  \
+    else dkda_push__success = false;                                                                                             \
+  }                                                                                                                              \
+  if (dkda_push__success) (arr)[((dkda_header *)(arr) - 1)->data.count++] = (element);                                           \
+  dkda_push__success;                                                                                                            \
   })
 
-#define dkda_reserve(arena, arr, size)                                                                                 \
-  ({                                                                                                                   \
-  bool dkda_reserve__success = false;                                                                                  \
-  void *dkda_reserve__tmp = impl_dkda__reservation((arena), (arr), sizeof(*(arr)), (size));                            \
-  if (dkda_reserve__tmp) {                                                                                             \
-    (arr) = dkda_reserve__tmp;                                                                                         \
-    dkda_reserve__success = true;                                                                                      \
-  }                                                                                                                    \
-  dkda_reserve__success;                                                                                               \
+#define dkda_reserve(arena, arr, size)                                                                                           \
+  ({                                                                                                                             \
+  bool dkda_reserve__success = false;                                                                                            \
+  void *dkda_reserve__tmp = impl_dkda__reservation((arena), (arr), sizeof(*(arr)), (size));                                      \
+  if (dkda_reserve__tmp) {                                                                                                       \
+    (arr) = dkda_reserve__tmp;                                                                                                   \
+    dkda_reserve__success = true;                                                                                                \
+  }                                                                                                                              \
+  dkda_reserve__success;                                                                                                         \
   })
 
-#define dkda_print(stream, fmt, arr)                                                                                   \
-  do {                                                                                                                 \
-    size_t dkda_print__len = dkda_len(arr);                                                                            \
-    fputc('[', (stream));                                                                                              \
-                                                                                                                       \
-    for (size_t dkda_print__index = 0; dkda_print__index < dkda_print__len; dkda_print__index++) {                     \
-      if (dkda_print__index > 0) fputs(", ", (stream));                                                                \
-      fprintf((stream), (fmt), (arr)[dkda_print__index]);                                                              \
-    }                                                                                                                  \
-    fputc(']', (stream));                                                                                              \
+#define dkda_print(stream, fmt, arr)                                                                                             \
+  do {                                                                                                                           \
+    size_t dkda_print__len = dkda_len(arr);                                                                                      \
+    fputc('[', (stream));                                                                                                        \
+                                                                                                                                 \
+    for (size_t dkda_print__index = 0; dkda_print__index < dkda_print__len; dkda_print__index++) {                               \
+      if (dkda_print__index > 0) fputs(", ", (stream));                                                                          \
+      fprintf((stream), (fmt), (arr)[dkda_print__index]);                                                                        \
+    }                                                                                                                            \
+    fputc(']', (stream));                                                                                                        \
   } while (false)
 
-#define dkda_println(stream, fmt, arr)                                                                                 \
-  do {                                                                                                                 \
-    dkda_print(stream, fmt, arr);                                                                                      \
-    fputc('\n', (stream));                                                                                             \
+#define dkda_println(stream, fmt, arr)                                                                                           \
+  do {                                                                                                                           \
+    dkda_print(stream, fmt, arr);                                                                                                \
+    fputc('\n', (stream));                                                                                                       \
   } while (false)
 
-#define dkda_print_fancy(stream, fmt, arr)                                                                             \
-  do {                                                                                                                 \
-    fprintf((stream),                                                                                                  \
-            "Array '%s' (len: %zu, cap: %zu) at 0x%" PRIXPTR ": ",                                                     \
-            #arr,                                                                                                      \
-            dkda_len(arr),                                                                                             \
-            dkda_cap(arr),                                                                                             \
-            (uintptr_t)(arr));                                                                                         \
-    dkda_print(stream, fmt, arr);                                                                                      \
-    fputc('\n', (stream));                                                                                             \
+#define dkda_print_fancy(stream, fmt, arr)                                                                                       \
+  do {                                                                                                                           \
+    fprintf(                                                                                                                     \
+      (stream), "Array '%s' (len: %zu, cap: %zu) at 0x%" PRIXPTR ": ", #arr, dkda_len(arr), dkda_cap(arr), (uintptr_t)(arr));    \
+    dkda_print(stream, fmt, arr);                                                                                                \
+    fputc('\n', (stream));                                                                                                       \
   } while (false)
 
 DKA_DEC void *impl_dkda__memdup(dk_arena *arena, const void *src, size_t elem_size);
@@ -686,29 +679,28 @@ typedef struct {
   bool ignore_ord; // default: false
 } dksb__params;
 
-#define dksb_build(arena, str)           ((str) ? impl_dksb__build((arena), (str), strlen(str)) : NULL)
-#define dksb_build_wlen(arena, str, len) impl_dksb__build((arena), (str), (len))
-#define dksb_strdup(arena, sb)           impl_dksb__build((arena), (sb), dksb_strlen(sb))
-#define dksb_null_terminate(arena, sb)   impl_dksb__push_null((arena), &(sb))
-#define dksb_tolower(sb)                 impl_dksb__letter_case_shift(&(sb), true)
-#define dksb_toupper(sb)                 impl_dksb__letter_case_shift(&(sb), false)
-#define dksb_insert(arena, sb, c, n)     impl_dksb__insertion((arena), &(sb), (c), (n))
-#define dksb_append(arena, sb, c)        impl_dksb__insertion((arena), &(sb), (c), dksb_strlen(sb))
-#define dksb_concat(arena, sb, str)      ((str) ? impl_dksb__concatenation((arena), &(sb), (str), strlen(str)) : false)
+#define dksb_build(arena, str)                ((str) ? dksb_build_wlen((arena), (str), strlen(str)) : NULL)
+#define dksb_build_lit(arena, str_lit)        dksb_build_wlen((arena), ("" str_lit), sizeof("" str_lit))
+#define dksb_strdup(arena, sb)                dksb_build_wlen((arena), (sb), dksb_strlen(sb))
+#define dksb_null_terminate(arena, sb)        impl_dksb__push_null((arena), &(sb))
+#define dksb_tolower(sb)                      impl_dksb__letter_case_shift(&(sb), true)
+#define dksb_toupper(sb)                      impl_dksb__letter_case_shift(&(sb), false)
+#define dksb_insert(arena, sb, c, n)          impl_dksb__insertion((arena), &(sb), (c), (n))
+#define dksb_append(arena, sb, c)             impl_dksb__insertion((arena), &(sb), (c), dksb_strlen(sb))
+#define dksb_concat(arena, sb, str)           ((str) ? impl_dksb__concatenation((arena), &(sb), (str), strlen(str)) : false)
 #define dksb_concat_wlen(arena, sb, str, len) impl_dksb__concatenation((arena), &(sb), (str), (len))
 #define dksb_remove(sb, n, ...)               impl_dksb__removal(&(sb), (n), (dksb__params){.dummy = 0, ##__VA_ARGS__})
 #define dksb_reverse(sb)                      impl_dksb__reversal(&(sb))
-#define dksb_clear(sb) (void)(((sb)) ? (((dkda_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
+#define dksb_clear(sb)                        (void)(((sb)) ? (((dkda_header *)(sb) - 1)->data.count = 1, (sb)[0] = '\0') : 0)
 
 DKA_DEC size_t dksb_strlen(dksb sb);
 DKA_DEC bool dksb_isempty(dksb sb);
 DKA_DEC bool dksb_equals(dksb a, dksb b);
 DKA_DEC bool dksb_equals_ic(dksb a, dksb b);
 DKA_DEC int dksb_compare(dksb a, dksb b);
+DKA_DEC dksb dksb_build_wlen(dk_arena *arena, const char *str, size_t len);
 
-DKA_DEC dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len);
 DKA_DEC bool impl_dksb__push_null(dk_arena *arena, dksb *sb);
-DKA_DEC bool impl_dksb__pop_null(dksb *sb);
 DKA_DEC bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower);
 DKA_DEC bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n);
 DKA_DEC bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, size_t b_len);
@@ -768,7 +760,7 @@ DKA_DEF int dksb_compare(dksb a, dksb b) {
   return 0;
 } /* dksb_compare() */
 
-DKA_DEF dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len) {
+DKA_DEF dksb dksb_build_wlen(dk_arena *arena, const char *str, size_t len) {
   if ((!arena) || (!str)) return NULL;
 
   if (__builtin_add_overflow(len, (size_t)1, &len)) goto error_oom;
@@ -784,7 +776,18 @@ DKA_DEF dksb impl_dksb__build(dk_arena *arena, const char *str, size_t len) {
 error_oom:
   arena->handle_oom(arena, SIZE_MAX);
   return NULL;
-} /* impl_dksb__build() */
+} /* dksb_build_wlen() */
+
+static inline bool hlpr_dksb__pop_null(dksb *sb) {
+  if (!sb) return false;
+  if (!(*sb)) return false;
+
+  size_t len = dkda_len(*sb);
+  if (!len) return false;
+  if (dkda_last(*sb) == '\0') dkda_pop(*sb);
+
+  return true;
+} /* hlpr_dksb__pop_null() */
 
 DKA_DEF bool impl_dksb__push_null(dk_arena *arena, dksb *sb) {
   if ((!arena) || (!sb)) return false;
@@ -796,17 +799,6 @@ DKA_DEF bool impl_dksb__push_null(dk_arena *arena, dksb *sb) {
 
   return true;
 } /* impl_dksb__push_null() */
-
-DKA_DEF bool impl_dksb__pop_null(dksb *sb) {
-  if (!sb) return false;
-  if (!(*sb)) return false;
-
-  size_t len = dkda_len(*sb);
-  if (!len) return false;
-  if (dkda_last(*sb) == '\0') dkda_pop(*sb);
-
-  return true;
-} /* impl_dksb__pop_null() */
 
 DKA_DEF bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower) {
   if (!sb) return false;
@@ -824,7 +816,7 @@ DKA_DEF bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower) {
 DKA_DEF bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n) {
   if ((!arena) || (!sb)) return false;
   if (!(*sb)) return false;
-  impl_dksb__pop_null(sb);
+  hlpr_dksb__pop_null(sb);
 
   size_t len = dksb_strlen(*sb);
   size_t cap = dkda_cap(*sb);
@@ -862,7 +854,7 @@ DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, s
   else if (__builtin_add_overflow(rq_size, (size_t)1, &rq_size)) goto error_oom;
 
   size_t a_cap = dkda_cap(*a);
-  impl_dksb__pop_null(a);
+  hlpr_dksb__pop_null(a);
 
   if (rq_size > a_cap) {
     size_t new_cap;
@@ -899,7 +891,7 @@ DKA_DEF bool impl_dksb__removal(dksb *sb, size_t n, dksb__params params) {
     return true;
   }
 
-  impl_dksb__pop_null(sb);
+  hlpr_dksb__pop_null(sb);
 
   if (params.ignore_ord) {
     if (!dkda_rem((*sb), n)) return false;
