@@ -1,3 +1,5 @@
+#define DKSV_IMPLEMENTATION
+
 /*
 # `dk_strview.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for string views. See end of file for license information.
@@ -583,7 +585,7 @@ DKSV_DEF double dksv_to_dbl(dksv sv) {
   sv = dksv_trim(sv);
   if (dksv_isempty(sv)) return NAN;
 
-  int sign = 1;
+  int8_t sign = 1;
   switch (sv.data[0]) {
     case '-': sign = -1; /* fallthrough */
     case '+': sv = dksv_drop(sv, 1); break;
@@ -598,7 +600,7 @@ DKSV_DEF double dksv_to_dbl(dksv sv) {
 
   size_t index = 0;
   long double result = 0.0L;
-  int implicit_exp = 0;
+  uint64_t implicit_exp = 0;
   bool has_digits = false;
 
   while ((index < sv.len) && (isdigit((unsigned char)sv.data[index]))) {
@@ -628,8 +630,8 @@ DKSV_DEF double dksv_to_dbl(dksv sv) {
 
   if (!has_digits) return NAN;
 
-  int exp_sign = 1;
-  int exponent = 0;
+  int8_t exp_sign = 1;
+  int64_t exponent = 0;
 
   if ((index < sv.len) && (toupper((unsigned char)sv.data[index]) == 'E')) {
     index++;
@@ -652,7 +654,7 @@ DKSV_DEF double dksv_to_dbl(dksv sv) {
     if (!has_exp_digits) return NAN;
   }
 
-  int total_exp = (exp_sign * exponent) + implicit_exp;
+  int64_t total_exp = (exp_sign * exponent) + implicit_exp;
   if ((total_exp != 0) && (result != 0.0L)) result *= powl(10.0L, total_exp);
 
   return (index < sv.len) ? NAN : (double)(result * sign);
