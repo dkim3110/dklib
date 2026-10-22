@@ -43,10 +43,6 @@ This library does not concern itself with C++ support.
 #ifndef DK_STR_VIEW_H_
 #define DK_STR_VIEW_H_
 
-#ifndef _GNU_SOURCE
-  #define _GNU_SOURCE
-#endif //_GNU_SOURCE
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -63,20 +59,15 @@ typedef struct {
 #define DKSV_FMT     "%.*s"
 #define DKSV_ARG(sv) (int)(sv).len, (sv).data
 
-#define dksv_view(str) dksv_view_wlen((str), strlen(str))
-
-#ifdef DKA_STRING_BUILDER_GUARD
-  #define dksb_to_dksv(sb) dksv_view_wlen((sb), dksb_strlen(sb))
-#endif // DKA_STRING_BUILDER_GUARD
+#define dksv_view(str)         ((str) ? dksv_view_wlen((str), strlen(str)) : DKSV_NULL)
+#define dksv_view_lit(str_lit) dksv_view_wlen(("" str_lit), sizeof("" str_lit) - 1)
+#define dksb_to_dksv(sb)       dksv_view_wlen((sb), dksb_strlen(sb))
 
 DKSV_DEC bool dksv_isempty(dksv sv);
-DKSV_DEC bool dksv_isblank(dksv sv);
+DKSV_DEC bool dksv_istype(dksv sv, int (*istype)(int c));
 DKSV_DEC bool dksv_equals(dksv a, dksv b);
 DKSV_DEC bool dksv_ic_equals(dksv a, dksv b);
-DKSV_DEC int dksv_cmp(dksv a, dksv b);
-DKSV_DEC bool dksv_isalpha(dksv sv);
-DKSV_DEC bool dksv_isalnum(dksv sv);
-DKSV_DEC bool dksv_isdigit(dksv sv);
+DKSV_DEC int dksv_compare(dksv a, dksv b);
 
 DKSV_DEC void dksv_fput(dksv sv, FILE *stream);
 DKSV_DEC void dksv_print(dksv sv);
@@ -86,7 +77,7 @@ DKSV_DEC dksv dksv_take(dksv sv, size_t n);
 DKSV_DEC dksv dksv_drop(dksv sv, size_t n);
 DKSV_DEC dksv dksv_sub(dksv sv, size_t start, size_t end);
 DKSV_DEC dksv dksv_split(dksv *sv, char delimiter);
-DKSV_DEC dksv dksv_split_ws(dksv *sv);
+DKSV_DEC dksv dksv_split_type(dksv *sv, int (*istype)(int c));
 
 DKSV_DEC dksv dksv_trim(dksv sv);
 DKSV_DEC dksv dksv_ltrim(dksv sv);
@@ -95,14 +86,14 @@ DKSV_DEC dksv dksv_trimc(dksv sv, char c);
 DKSV_DEC dksv dksv_ltrimc(dksv sv, char c);
 DKSV_DEC dksv dksv_rtrimc(dksv sv, char c);
 
-DKSV_DEC bool dksv_prefix(dksv base, dksv prefix);
-DKSV_DEC bool dksv_suffix(dksv base, dksv suffix);
-DKSV_DEC bool dksv_ic_prefix(dksv base, dksv prefix);
-DKSV_DEC bool dksv_ic_suffix(dksv base, dksv suffix);
+DKSV_DEC bool dksv_isprefix(dksv base, dksv prefix);
+DKSV_DEC bool dksv_issuffix(dksv base, dksv suffix);
+DKSV_DEC bool dksv_ic_isprefix(dksv base, dksv prefix);
+DKSV_DEC bool dksv_ic_issuffix(dksv base, dksv suffix);
 DKSV_DEC bool dksv_contains(dksv base, dksv item);
-DKSV_DEC int64_t idx_dksv_contains(dksv base, dksv item);
-DKSV_DEC int64_t dksv_idx(dksv sv, char c);
-DKSV_DEC int64_t dksv_idx_last(dksv sv, char c);
+DKSV_DEC int64_t dksv_contains_idx(dksv base, dksv item);
+DKSV_DEC int64_t dksv_idxof(dksv sv, char c);
+DKSV_DEC int64_t dksv_idxof_last(dksv sv, char c);
 DKSV_DEC int32_t dksv_char_at(dksv sv, size_t index);
 DKSV_DEC size_t dksv_count_char(dksv sv, char c);
 
@@ -127,19 +118,18 @@ DKSV_DEF bool dksv_isempty(dksv sv) {
 } /* dksv_isempty() */
 
 /*
- * Function to verify if a given dksv struct is blank: either empty or consisting of only whitespaces.
- * Returns 1 if true, 0 if false.
+ * Function to verify if a given dksv struct purely consists of a type determined by the given by the function.
  */
 
-DKSV_DEF bool dksv_isblank(dksv sv) {
-  if (dksv_isempty(sv)) return true;
+DKSV_DEF bool dksv_istype(dksv sv, int (*istype)(int c)) {
+  if (dksv_isempty(sv)) return false;
 
   for (size_t n = 0; n < sv.len; n++) {
-    if (!isspace((unsigned char)sv.data[n])) return false;
+    if (!istype((unsigned char)sv.data[n])) return false;
   }
 
   return true;
-} /* dksv_isblank() */
+} /* dksv_istype() */
 
 /*
  * Function to verify if two dksv structs are equal.
@@ -174,60 +164,17 @@ DKSV_DEF bool dksv_ic_equals(dksv a, dksv b) {
  * and a positive value if a is greater than b.
  */
 
-DKSV_DEF int dksv_cmp(dksv a, dksv b) {
+DKSV_DEF int dksv_compare(dksv a, dksv b) {
+  if (dksv_isempty(a)) a = DKSV_NULL;
+  if (dksv_isempty(b)) b = DKSV_NULL;
+
   size_t cmp_len = (a.len < b.len) ? a.len : b.len;
   int cmp = (cmp_len) ? memcmp(a.data, b.data, cmp_len) : 0;
 
   if (cmp) return cmp;
   if (a.len != b.len) return (a.len < b.len) ? -1 : 1;
   return 0;
-} /* dksv_cmp() */
-
-/*
- * Function to determine if a given dksv struct consists of only alphabet characters.
- * Returns 1 if true, 0 if false.
- */
-
-DKSV_DEF bool dksv_isalpha(dksv sv) {
-  if (dksv_isempty(sv)) return false;
-
-  for (size_t n = 0; n < sv.len; n++) {
-    if (!isalpha((unsigned char)sv.data[n])) return false;
-  }
-
-  return true;
-} /* dksv_isalpha() */
-
-/*
- * Function to determine if a given dksv struct consists of only alphabet characters
- * and digits.
- * Returns 1 if true, 0 if false.
- */
-
-DKSV_DEF bool dksv_isalnum(dksv sv) {
-  if (dksv_isempty(sv)) return false;
-
-  for (size_t n = 0; n < sv.len; n++) {
-    if (!isalnum((unsigned char)sv.data[n])) return false;
-  }
-
-  return true;
-} /* dksv_isalnum() */
-
-/*
- * Function to determine if a given dksv struct consists of only digits.
- * Returns 1 if true, 0 if false.
- */
-
-DKSV_DEF bool dksv_isdigit(dksv sv) {
-  if (dksv_isempty(sv)) return false;
-
-  for (size_t n = 0; n < sv.len; n++) {
-    if (!isdigit((unsigned char)sv.data[n])) return false;
-  }
-
-  return true;
-} /* dksv_isdigit() */
+} /* dksv_compare() */
 
 /*
  * Function to write a dksv struct to a specified file stream.
@@ -257,7 +204,7 @@ DKSV_DEF void dksv_println(dksv sv) {
 
 /*
  * Function to take characters from a given dksv struct up to the specified index.
- * It is exclusive and thus will not take the character at index n.
+ * It is exclusive and thus will not take the character at index base.len.
  * Returns sv unmodified if empty.
  */
 
@@ -270,7 +217,7 @@ DKSV_DEF dksv dksv_take(dksv sv, size_t n) {
 
 /*
  * Function to drop characters from a dksv struct up to the specified index.
- * It is exclusive and thus will not drop the character at index n.
+ * It is exclusive and thus will not drop the character at index base.len.
  * Returns sv unmodifed if empty.
  */
 
@@ -282,7 +229,7 @@ DKSV_DEF dksv dksv_drop(dksv sv, size_t n) {
 } /* dksv_drop() */
 
 /*
- * Function to extract a substring from a dksv struct from the start and end indexes provided.
+ * Function to extract a substring from a dksv struct from the start and end indices provided.
  * Start is inclusive, end is exclusive.
  */
 
@@ -298,6 +245,7 @@ DKSV_DEF dksv dksv_sub(dksv sv, size_t start, size_t end) {
  */
 
 DKSV_DEF dksv dksv_split(dksv *sv, char delimiter) {
+  if (!sv) return DKSV_NULL;
   if (dksv_isempty(*sv)) return *sv;
 
   const char *found = (const char *)memchr(sv->data, delimiter, sv->len);
@@ -311,24 +259,25 @@ DKSV_DEF dksv dksv_split(dksv *sv, char delimiter) {
 } /* dksv_split() */
 
 /*
- * Function to split a given dksv struct by whitespaces.
- * Returns a dksv struct up to the first instance of a whitespace, or the original string
+ * Function to split a given dksv struct by a given type function.
+ * Returns a dksv struct up to the first instance of the type, or the original string
  * if it is empty. The original dksv struct retains all characters after the
  * delimiter; mutated by the function. The delimiter itself gets consumed.
  */
 
-DKSV_DEF dksv dksv_split_ws(dksv *sv) {
+DKSV_DEF dksv dksv_split_type(dksv *sv, int (*istype)(int c)) {
+  if (!sv) return DKSV_NULL;
   if (dksv_isempty(*sv)) return *sv;
 
   size_t n = 0;
-  while ((n < sv->len) && (!isspace((unsigned char)sv->data[n]))) n++;
+  while ((n < sv->len) && (!istype((unsigned char)sv->data[n]))) n++;
 
   dksv result = dksv_take(*sv, n);
   if (n < sv->len) *sv = dksv_drop(*sv, n + 1);
   else *sv = dksv_drop(*sv, n);
 
   return result;
-} /* dksv_split_ws() */
+} /* dksv_split_type() */
 
 /*
  * Function to trim leading and trailing whitespace from a given dksv struct.
@@ -404,12 +353,11 @@ DKSV_DEF dksv dksv_rtrimc(dksv sv, char c) {
  * all strings.
  */
 
-DKSV_DEF bool dksv_prefix(dksv base, dksv prefix) {
+DKSV_DEF bool dksv_isprefix(dksv base, dksv prefix) {
   if (dksv_isempty(prefix)) return true;
-  if ((!base.data) || (!prefix.data)) return false;
   if ((prefix.len > base.len) || (dksv_isempty(base))) return false;
   return (memcmp(base.data, prefix.data, prefix.len) == 0);
-} /* dksv_prefix() */
+} /* dksv_isprefix() */
 
 /*
  * Function to verify if a given dksv struct ends with the specified suffix.
@@ -417,12 +365,11 @@ DKSV_DEF bool dksv_prefix(dksv base, dksv prefix) {
  * all strings.
  */
 
-DKSV_DEF bool dksv_suffix(dksv base, dksv suffix) {
+DKSV_DEF bool dksv_issuffix(dksv base, dksv suffix) {
   if (dksv_isempty(suffix)) return true;
-  if ((!base.data) || (!suffix.data)) return false;
   if ((suffix.len > base.len) || (dksv_isempty(base))) return false;
   return (memcmp(base.data + (base.len - suffix.len), suffix.data, suffix.len) == 0);
-} /* dksv_suffix() */
+} /* dksv_issuffix() */
 
 /*
  * Function to verify if a given dksv struct starts with the specified prefix, ignoring letter case.
@@ -430,12 +377,11 @@ DKSV_DEF bool dksv_suffix(dksv base, dksv suffix) {
  * all strings.
  */
 
-DKSV_DEF bool dksv_ic_prefix(dksv base, dksv prefix) {
+DKSV_DEF bool dksv_ic_isprefix(dksv base, dksv prefix) {
   if (dksv_isempty(prefix)) return true;
-  if ((!base.data) || (!prefix.data)) return false;
   if ((prefix.len > base.len) || (dksv_isempty(base))) return false;
   return dksv_ic_equals(dksv_take(base, prefix.len), prefix);
-} /* dksv_ic_prefix() */
+} /* dksv_ic_isprefix() */
 
 /*
  * Function to verify if a given dksv struct ends with the specified suffix, ignoring letter case.
@@ -443,12 +389,11 @@ DKSV_DEF bool dksv_ic_prefix(dksv base, dksv prefix) {
  * all strings.
  */
 
-DKSV_DEF bool dksv_ic_suffix(dksv base, dksv suffix) {
+DKSV_DEF bool dksv_ic_issuffix(dksv base, dksv suffix) {
   if (dksv_isempty(suffix)) return true;
-  if ((!base.data) || (!suffix.data)) return false;
   if ((suffix.len > base.len) || (dksv_isempty(base))) return false;
   return dksv_ic_equals(dksv_drop(base, base.len - suffix.len), suffix);
-} /* dksv_ic_suffix() */
+} /* dksv_ic_issuffix() */
 
 /*
  * Function to verify if a given dksv struct contains the specified string.
@@ -457,8 +402,39 @@ DKSV_DEF bool dksv_ic_suffix(dksv base, dksv suffix) {
  */
 
 DKSV_DEF bool dksv_contains(dksv base, dksv item) {
-  return (idx_dksv_contains(base, item) != -1);
+  return (dksv_contains_idx(base, item) != -1);
 } /* dksv_contains() */
+
+static inline size_t hlpr_dksv__max_suffix(const unsigned char *n, size_t nl, bool rev, size_t *period) {
+  size_t ip = SIZE_MAX;
+  size_t jp = 0;
+  size_t k = 1;
+  size_t p = 1;
+
+  while (jp + k < nl) {
+    unsigned char a = n[ip + k];
+    unsigned char b = n[jp + k];
+
+    if (rev ? (a < b) : (a > b)) {
+      jp += k;
+      k = 1;
+      p = jp - ip;
+    } else if (a == b) {
+      if (k == p) {
+        jp += p;
+        k = 1;
+      } else {
+        k++;
+      }
+    } else {
+      ip = jp++;
+      k = p = 1;
+    }
+  }
+
+  *period = p;
+  return ip + 1;
+} /* hlpr_dksv__max_suffix() */
 
 /*
  * Function to verify if a given dksv struct contains the specified string.
@@ -466,13 +442,74 @@ DKSV_DEF bool dksv_contains(dksv base, dksv item) {
  * of the first occurrence or -1 if the base dksv does not contain the item.
  */
 
-DKSV_DEF int64_t idx_dksv_contains(dksv base, dksv item) {
+DKSV_DEF int64_t dksv_contains_idx(dksv base, dksv item) {
   if (dksv_isempty(item)) return 0;
   if ((item.len > base.len) || (dksv_isempty(base))) return -1;
+  if (item.len == 1) return dksv_idxof(base, item.data[0]);
 
-  char *sub = memmem(base.data, base.len, item.data, item.len);
-  return (sub) ? sub - base.data : -1;
-} /* idx_dksv_contains() */
+  const unsigned char *uc_base = (const unsigned char *)base.data;
+  const unsigned char *uc_item = (const unsigned char *)item.data;
+
+  size_t p1, p2;
+  size_t ms1 = hlpr_dksv__max_suffix(uc_item, item.len, false, &p1);
+  size_t ms2 = hlpr_dksv__max_suffix(uc_item, item.len, true, &p2);
+
+  size_t ms = (ms1 > ms2) ? ms1 : ms2;
+  size_t p = (ms1 > ms2) ? p1 : p2;
+
+  if (memcmp(uc_item, uc_item + p, ms) == 0) {
+    size_t pos = 0;
+    size_t mem = 0;
+
+    while (pos <= base.len - item.len) {
+      if (!mem) {
+        const unsigned char *hit =
+          (const unsigned char *)memchr(uc_base + pos + ms, uc_item[ms], (base.len - item.len) - pos + 1);
+        if (!hit) return -1;
+        pos = (size_t)(hit - uc_base) - ms;
+      }
+
+      size_t n = (ms > mem) ? ms : mem;
+      while ((n < item.len) && (uc_item[n] == uc_base[pos + n])) n++;
+
+      if (n < item.len) {
+        pos += n - ms + 1;
+        mem = 0;
+        continue;
+      }
+
+      n = ms;
+      while ((n > mem) && (uc_item[n - 1] == uc_base[pos + n - 1])) n--;
+      if (n <= mem) return (int64_t)pos;
+      pos += p;
+      mem = item.len - p;
+    }
+  } else {
+    p = ((ms > (item.len - ms)) ? ms : (item.len - ms)) + 1;
+    size_t pos = 0;
+
+    while (pos <= base.len - item.len) {
+      const unsigned char *hit = (const unsigned char *)memchr(uc_base + pos + ms, uc_item[ms], (base.len - item.len) - pos + 1);
+      if (!hit) return -1;
+      pos = (size_t)(hit - uc_base) - ms;
+
+      size_t n = ms + 1;
+      while ((n < item.len) && (uc_item[n] == uc_base[pos + n])) n++;
+
+      if (n < item.len) {
+        pos += n - ms + 1;
+        continue;
+      }
+
+      n = ms;
+      while ((n > 0) && (uc_item[n - 1] == uc_base[pos + n - 1])) n--;
+      if (n == 0) return (int64_t)pos;
+      pos += p;
+    }
+  }
+
+  return -1;
+} /* dksv_contains_idx() */
 
 /*
  * Function to identify the index within the dksv struct of the first occurrence
@@ -480,11 +517,11 @@ DKSV_DEF int64_t idx_dksv_contains(dksv base, dksv item) {
  * Returns -1 if no matching characters are found.
  */
 
-DKSV_DEF int64_t dksv_idx(dksv sv, char c) {
+DKSV_DEF int64_t dksv_idxof(dksv sv, char c) {
   if (dksv_isempty(sv)) return -1;
   const char *found = (const char *)memchr(sv.data, c, sv.len);
   return (found) ? found - sv.data : -1;
-} /* dksv_idx() */
+} /* dksv_idxof() */
 
 /*
  * Function to identify the index within the dksv struct of the last occurrence
@@ -492,11 +529,15 @@ DKSV_DEF int64_t dksv_idx(dksv sv, char c) {
  * Returns -1 if no matching characters are found.
  */
 
-DKSV_DEF int64_t dksv_idx_last(dksv sv, char c) {
+DKSV_DEF int64_t dksv_idxof_last(dksv sv, char c) {
   if (dksv_isempty(sv)) return -1;
-  const char *found = (const char *)memrchr(sv.data, c, sv.len);
-  return (found) ? found - sv.data : -1;
-} /* dksv_idx_last() */
+
+  for (int64_t n = sv.len - 1; n >= 0; n--) {
+    if (sv.data[n] == c) return n;
+  }
+
+  return -1;
+} /* dksv_idxof_last() */
 
 /*
  * Function to identify the character in a dksv struct at the given index.
@@ -542,36 +583,42 @@ DKSV_DEF double dksv_to_dbl(dksv sv) {
   sv = dksv_trim(sv);
   if (dksv_isempty(sv)) return NAN;
 
-  if (dksv_ic_equals(sv, dksv_view("nan"))) return NAN;
-  if ((dksv_ic_equals(sv, dksv_view("inf"))) || (dksv_ic_equals(sv, dksv_view("+inf")))) return INFINITY;
-  if (dksv_ic_equals(sv, dksv_view("-inf"))) return -INFINITY;
-
-  size_t index = 0;
   int sign = 1;
-
-  switch (sv.data[index]) {
+  switch (sv.data[0]) {
     case '-': sign = -1; /* fallthrough */
-    case '+': index++; break;
+    case '+': sv = dksv_drop(sv, 1); break;
     default:  break;
   }
 
-  long double result = 0.0;
+  if (dksv_isempty(sv)) return NAN;
+  if (dksv_ic_equals(sv, dksv_view_lit("nan"))) return NAN;
+  if ((dksv_ic_equals(sv, dksv_view_lit("inf"))) || (dksv_ic_equals(sv, dksv_view_lit("infinity")))) {
+    return (sign < 0) ? -INFINITY : INFINITY;
+  }
+
+  size_t index = 0;
+  long double result = 0.0L;
+  int implicit_exp = 0;
   bool has_digits = false;
 
   while ((index < sv.len) && (isdigit((unsigned char)sv.data[index]))) {
-    result = (result * 10.0) + (sv.data[index] - '0');
+    if (result < 1e36L) result = (result * 10.0L) + (sv.data[index] - '0');
+    else if (implicit_exp < 9999) implicit_exp++;
+
     has_digits = true;
     index++;
   }
 
   if ((index < sv.len) && (sv.data[index] == '.')) {
     index++;
-    long double fraction = 0.0;
-    long double divisor = 1.0;
+    long double fraction = 0.0L;
+    long double divisor = 1.0L;
 
     while ((index < sv.len) && (isdigit((unsigned char)sv.data[index]))) {
-      fraction = (fraction * 10.0) + (sv.data[index] - '0');
-      divisor *= 10.0;
+      if (fraction < 1e36L) {
+        fraction = (fraction * 10.0L) + (sv.data[index] - '0');
+        divisor *= 10.0L;
+      }
       has_digits = true;
       index++;
     }
@@ -581,9 +628,11 @@ DKSV_DEF double dksv_to_dbl(dksv sv) {
 
   if (!has_digits) return NAN;
 
+  int exp_sign = 1;
+  int exponent = 0;
+
   if ((index < sv.len) && (toupper((unsigned char)sv.data[index]) == 'E')) {
     index++;
-    int exp_sign = 1;
 
     if (index < sv.len) {
       switch (sv.data[index]) {
@@ -593,16 +642,20 @@ DKSV_DEF double dksv_to_dbl(dksv sv) {
       }
     }
 
-    int exponent = 0;
+    bool has_exp_digits = false;
     while ((index < sv.len) && (isdigit((unsigned char)sv.data[index]))) {
       if (exponent < 9999) exponent = (exponent * 10) + (sv.data[index] - '0');
+      has_exp_digits = true;
       index++;
     }
 
-    if (exponent != 0) result *= pow(10.0, exp_sign * exponent);
+    if (!has_exp_digits) return NAN;
   }
 
-  return (index < sv.len) ? NAN : result * sign;
+  int total_exp = (exp_sign * exponent) + implicit_exp;
+  if ((total_exp != 0) && (result != 0.0L)) result *= powl(10.0L, total_exp);
+
+  return (index < sv.len) ? NAN : (double)(result * sign);
 } /* dksv_to_dbl() */
 
 #endif // DKSV_IMPLEMENTATION
