@@ -446,7 +446,7 @@ typedef union {
   max_align_t align;
 } dkda_header;
 
-#define DKDA_INITIAL_CAPACITY (8)
+#define DKDA_DEFAULT_CAPACITY (16)
 
 #define dkda_init(arena, type, size) impl_dkda__initialization((arena), sizeof(type), (size))
 #define dkda_len(arr)                ((arr) ? ((dkda_header *)(arr) - 1)->data.count : 0)
@@ -635,10 +635,10 @@ error_oom:
 
 DKA_DEF void *impl_dkda__growth(dk_arena *arena, void *arr, size_t elem_size) {
   if ((!arena) || (!elem_size)) return NULL;
-  if (!arr) return impl_dkda__initialization(arena, elem_size, DKDA_INITIAL_CAPACITY);
+  if (!arr) return impl_dkda__initialization(arena, elem_size, DKDA_DEFAULT_CAPACITY);
 
   dkda_header *header = (dkda_header *)arr - 1;
-  size_t new_cap = DKDA_INITIAL_CAPACITY;
+  size_t new_cap = DKDA_DEFAULT_CAPACITY;
   if ((header->data.cap) && (__builtin_mul_overflow(header->data.cap, (size_t)2, &new_cap))) goto error_oom;
 
   return impl_dkda__reservation(arena, arr, elem_size, new_cap);
