@@ -1,5 +1,3 @@
-#define DKSV_IMPLEMENTATION
-
 /*
 # `dk_strview.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for string views. See end of file for license information.
