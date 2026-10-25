@@ -59,7 +59,7 @@ typedef struct {
 #define DKSV_FMT     "%.*s"
 #define DKSV_ARG(sv) (int)(sv).len, (sv).data
 
-#define dksv_view(str)         ((str) ? dksv_view_wlen((str), strlen(str)) : DKSV_NULL)
+#define dksv_view(str)         dksv_view_wlen((str), strlen(str))
 #define dksv_view_lit(str_lit) dksv_view_wlen(("" str_lit), sizeof("" str_lit) - 1)
 #define dksb_to_dksv(sb)       dksv_view_wlen((sb), dksb_strlen(sb))
 

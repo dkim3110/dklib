@@ -141,6 +141,7 @@ you so choose. The oom handler should ideally exit the program.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 typedef struct dk_arena {
   size_t reserve;                                // total virtual memory reserved
@@ -200,6 +201,7 @@ DKA_DEC void dka_oom_handler(dk_arena *arena, size_t rq_size);
 DKA_DEC void dka_delete(dk_arena *arena);
 DKA_DEC void dka_rewind(dk_arena *arena, size_t pos);
 DKA_DEC void *dka_memdup(dk_arena *arena, const void *src, size_t bytes);
+DKA_DEC void *dka_fslurp(dk_arena *arena, const char *filename, size_t *filesize_out);
 
 DKA_DEC dk_arena *impl_dka__initialization(dka__params params);
 DKA_DEC void *impl_dka__allocation(dk_arena *arena, dka__params params, size_t size, bool zero_out);
@@ -256,6 +258,53 @@ error_oom:
   arena->handle_oom(arena, bytes);
   return NULL;
 } /* dka_memdup() */
+
+DKA_DEF void *dka_fslurp(dk_arena *arena, const char *filename, size_t *filesize_out) {
+  if ((!arena) || (!filename)) return NULL;
+
+  FILE *fptr = fopen(filename, "rb");
+  if (!fptr) return NULL;
+
+  int64_t filesize = -1;
+
+#ifdef __linux__
+  struct stat st;
+  if ((fstat(fileno(fptr), &st) == 0) && (S_ISREG(st.st_mode))) filesize = (int64_t)st.st_size;
+#elif defined(_WIN32)
+  struct _stat64 st;
+  if ((_fstat64(_fileno(fptr), &st) == 0) && ((st.st_mode & _S_IFMT) == _S_IFREG)) filesize = st.st_size;
+#endif
+
+  if (filesize < 0) goto error_file;
+
+  size_t alloc_size;
+  if (__builtin_add_overflow(filesize, (size_t)1, &alloc_size)) {
+    fclose(fptr);
+    arena->handle_oom(arena, SIZE_MAX);
+    return NULL;
+  }
+
+  dka_temp tmp = dka_take_snapshot(arena);
+  uint8_t *buffer = dka_alloc(arena, alloc_size);
+  if (!buffer) goto error_file;
+
+  if (filesize > 0) {
+    if (fread(buffer, sizeof(char), (size_t)filesize, fptr) < (size_t)filesize) {
+      dka_drop_snapshot(tmp);
+      goto error_file;
+    }
+  }
+
+  if (filesize_out) (*filesize_out) = (size_t)filesize;
+  buffer[filesize] = '\0';
+  fclose(fptr);
+
+  return buffer;
+
+error_file:
+  fclose(fptr);
+  return NULL;
+} /* dka_fslurp() */
 
 DKA_DEF dk_arena *impl_dka__initialization(dka__params params) {
   if (!params.reserve_size) params.reserve_size = DKA_GiB(1);
@@ -679,7 +728,7 @@ typedef struct {
   bool ignore_ord; // default: false
 } dksb__params;
 
-#define dksb_build(arena, str)                ((str) ? dksb_build_wlen((arena), (str), strlen(str)) : NULL)
+#define dksb_build(arena, str)                dksb_build_wlen((arena), (str), strlen(str))
 #define dksb_build_lit(arena, str_lit)        dksb_build_wlen((arena), ("" str_lit), sizeof("" str_lit))
 #define dksb_strdup(arena, sb)                dksb_build_wlen((arena), (sb), dksb_strlen(sb))
 #define dksb_null_terminate(arena, sb)        impl_dksb__push_null((arena), &(sb))
@@ -687,7 +736,7 @@ typedef struct {
 #define dksb_toupper(sb)                      impl_dksb__letter_case_shift(&(sb), false)
 #define dksb_insert(arena, sb, c, n)          impl_dksb__insertion((arena), &(sb), (c), (n))
 #define dksb_append(arena, sb, c)             impl_dksb__insertion((arena), &(sb), (c), dksb_strlen(sb))
-#define dksb_concat(arena, sb, str)           ((str) ? impl_dksb__concatenation((arena), &(sb), (str), strlen(str)) : false)
+#define dksb_concat(arena, sb, str)           impl_dksb__concatenation((arena), &(sb), (str), strlen(str))
 #define dksb_concat_wlen(arena, sb, str, len) impl_dksb__concatenation((arena), &(sb), (str), (len))
 #define dksb_remove(sb, n, ...)               impl_dksb__removal(&(sb), (n), (dksb__params){.dummy = 0, ##__VA_ARGS__})
 #define dksb_reverse(sb)                      impl_dksb__reversal(&(sb))
@@ -763,14 +812,15 @@ DKA_DEF int dksb_compare(dksb a, dksb b) {
 DKA_DEF dksb dksb_build_wlen(dk_arena *arena, const char *str, size_t len) {
   if ((!arena) || (!str)) return NULL;
 
-  if (__builtin_add_overflow(len, (size_t)1, &len)) goto error_oom;
-  dksb sb = impl_dkda__initialization(arena, sizeof(char), len + 1);
+  size_t alloc_size;
+  if (__builtin_add_overflow(len, (size_t)1, &alloc_size)) goto error_oom;
+  dksb sb = impl_dkda__initialization(arena, sizeof(char), alloc_size);
   if (!sb) return NULL;
 
   memcpy(sb, str, len);
   sb[len] = '\0';
 
-  ((dkda_header *)sb - 1)->data.count = len + 1;
+  ((dkda_header *)sb - 1)->data.count = alloc_size;
   return sb;
 
 error_oom:
