@@ -1,5 +1,3 @@
-#define DKA_GIMME_ALL
-
 /*
 # `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for virtual memory arenas. See end of file for license information.
