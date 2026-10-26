@@ -134,7 +134,6 @@ you so choose. The oom handler should ideally exit the program.
  #error "Unsupported Operating System"
 #endif // OPERATING SYSTEM
 
-#include <errno.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -221,6 +220,8 @@ DKA_DEC bool impl_dka__sys_mem_release(void *ptr, size_t size);
 
 #if defined(DKA_IMPLEMENTATION) && !defined(DKA_IMPLEMENTATION_GUARD)
 #define DKA_IMPLEMENTATION_GUARD
+
+#include <errno.h>
 
 DKA_DEF void dka_oom_handler(dk_arena *arena, size_t rq_size) {
   fprintf(stderr,
