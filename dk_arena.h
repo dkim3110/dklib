@@ -1,3 +1,5 @@
+#define DKA_GIMME_ALL
+
 /*
 # `dk_arena.h` - public domain - Daniel Inhoi Kim, 2026
 Header-only library for virtual memory arenas. See end of file for license information.
@@ -134,6 +136,7 @@ you so choose. The oom handler should ideally exit the program.
  #error "Unsupported Operating System"
 #endif // OPERATING SYSTEM
 
+#include <errno.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -201,7 +204,8 @@ DKA_DEC void dka_oom_handler(dk_arena *arena, size_t rq_size);
 DKA_DEC void dka_delete(dk_arena *arena);
 DKA_DEC void dka_rewind(dk_arena *arena, size_t pos);
 DKA_DEC void *dka_memdup(dk_arena *arena, const void *src, size_t bytes);
-DKA_DEC void *dka_fslurp(dk_arena *arena, const char *filename, size_t *filesize_out);
+DKA_DEC void *dka_fslurp_stream(dk_arena *arena, FILE *stream, size_t max_size, size_t *len_out);
+DKA_DEC void *dka_fslurp(dk_arena *arena, const char *filename, size_t *len_out);
 
 DKA_DEC dk_arena *impl_dka__initialization(dka__params params);
 DKA_DEC void *impl_dka__allocation(dk_arena *arena, dka__params params, size_t size, bool zero_out);
@@ -238,7 +242,13 @@ DKA_DEF void dka_delete(dk_arena *arena) {
 } /* dka_delete() */
 
 DKA_DEF void dka_rewind(dk_arena *arena, size_t pos) {
-  if (!arena) return;
+  if ((!arena) || (pos > arena->pos)) {
+    errno = EINVAL;
+    return;
+  }
+
+  if (pos == arena->pos) return;
+
   size_t new_pos = (pos < DKA_BASE_POS) ? DKA_BASE_POS : pos;
   if (new_pos < arena->pos) {
     arena->pos = new_pos;
@@ -246,64 +256,142 @@ DKA_DEF void dka_rewind(dk_arena *arena, size_t pos) {
 } /* dka_rewind() */
 
 DKA_DEF void *dka_memdup(dk_arena *arena, const void *src, size_t bytes) {
-  if ((!arena) || (!src) || (!bytes)) return NULL;
-  else if (bytes > (arena->reserve - arena->pos)) goto error_oom;
+  if ((!arena) || (!src)) {
+    errno = EINVAL;
+    return NULL;
+  }
 
   void *dest = dka_alloc(arena, bytes);
   if (!dest) return NULL;
 
   return memcpy(dest, src, bytes);
-
-error_oom:
-  arena->handle_oom(arena, bytes);
-  return NULL;
 } /* dka_memdup() */
 
-DKA_DEF void *dka_fslurp(dk_arena *arena, const char *filename, size_t *filesize_out) {
-  if ((!arena) || (!filename)) return NULL;
+DKA_DEF void *dka_fslurp_stream(dk_arena *arena, FILE *stream, size_t max_size, size_t *len_out) {
+  if ((!arena) || (!stream)) {
+    errno = EINVAL;
+    return NULL;
+  }
 
-  FILE *fptr = fopen(filename, "rb");
-  if (!fptr) return NULL;
-
-  int64_t filesize = -1;
+  clearerr(stream);
+  uint64_t remaining = 0;
 
 #ifdef __linux__
   struct stat st;
-  if ((fstat(fileno(fptr), &st) == 0) && (S_ISREG(st.st_mode))) filesize = (int64_t)st.st_size;
+  int fd = fileno(stream);
+  if ((fd >= 0) && (fstat(fd, &st) == 0)) {
+    if (S_ISDIR(st.st_mode)) {
+      errno = EISDIR;
+      return NULL;
+    }
+    if (S_ISREG(st.st_mode)) {
+      off_t pos = ftello(stream);
+      if ((pos >= 0) && (st.st_size > pos)) remaining = (uint64_t)(st.st_size - pos);
+    }
+  }
 #elif defined(_WIN32)
   struct _stat64 st;
-  if ((_fstat64(_fileno(fptr), &st) == 0) && ((st.st_mode & _S_IFMT) == _S_IFREG)) filesize = st.st_size;
+  int fd = _fileno(stream);
+  if ((fd >= 0) && (_fstat64(fd, &st) == 0)) {
+    if ((st.st_mode & _S_IFMT) == _S_IFDIR) {
+      errno = EISDIR;
+      return NULL;
+    }
+    if ((st.st_mode & _S_IFMT) == _S_IFREG) {
+      __int64 pos = _ftelli64(stream);
+      if ((pos >= 0) && (st.st_size > pos)) remaining = (uint64_t)(st.st_size - pos);
+    }
+  }
 #endif
 
-  if (filesize < 0) goto error_file;
+  errno = 0;
+  if (remaining > max_size) {
+    errno = EFBIG;
+    return NULL;
+  }
+
+  size_t cap = (size_t)remaining;
+  size_t total = 0;
+  size_t chunk = DKA_KiB(4);
 
   size_t alloc_size;
-  if (__builtin_add_overflow(filesize, (size_t)1, &alloc_size)) {
-    fclose(fptr);
+  if (__builtin_add_overflow(cap, (size_t)1, &alloc_size)) {
+    errno = ENOMEM;
     arena->handle_oom(arena, SIZE_MAX);
     return NULL;
   }
 
   dka_temp tmp = dka_take_snapshot(arena);
   uint8_t *buffer = dka_alloc(arena, alloc_size);
-  if (!buffer) goto error_file;
+  if (!buffer) return NULL;
 
-  if (filesize > 0) {
-    if (fread(buffer, sizeof(char), (size_t)filesize, fptr) < (size_t)filesize) {
-      dka_drop_snapshot(tmp);
-      goto error_file;
+  while (true) {
+    if (total == cap) {
+      int c = fgetc(stream);
+      if (c == EOF) {
+        if (ferror(stream)) goto error_fslurp;
+        break;
+      }
+      ungetc(c, stream);
+
+      size_t avail = arena->reserve - arena->pos;
+      size_t room_max = max_size - total;
+      size_t add = chunk;
+
+      if (add > room_max) add = room_max;
+      if (add > avail) add = avail;
+
+      if (!add) {
+        if (room_max == 0) errno = EFBIG;
+        else {
+          errno = ENOMEM;
+          arena->handle_oom(arena, (chunk < room_max) ? chunk : room_max);
+        }
+        goto error_fslurp;
+      }
+
+      size_t new_cap = total + add;
+      uint8_t *grown = dka_realloc(arena, buffer, cap + 1, new_cap + 1);
+      if (!grown) goto error_fslurp;
+
+      buffer = grown;
+      cap = new_cap;
+      if (chunk < DKA_MiB(1)) chunk *= 2;
     }
+
+    size_t room = cap - total;
+    size_t n = fread(buffer + total, sizeof(char), room, stream);
+    total += n;
+    if (ferror(stream)) goto error_fslurp;
+    if (n < room) break;
   }
 
-  if (filesize_out) (*filesize_out) = (size_t)filesize;
-  buffer[filesize] = '\0';
-  fclose(fptr);
+  if (cap > total) (void)dka_realloc(arena, buffer, cap + 1, total + 1);
+  if (len_out) (*len_out) = total;
+  buffer[total] = '\0';
 
   return buffer;
 
-error_file:
-  fclose(fptr);
+error_fslurp:
+  dka_drop_snapshot(tmp);
   return NULL;
+} /* dka_fslurp_stream() */
+
+DKA_DEF void *dka_fslurp(dk_arena *arena, const char *filename, size_t *len_out) {
+  if ((!arena) || (!filename)) {
+    errno = EINVAL;
+    return NULL;
+  }
+
+  FILE *fptr = fopen(filename, "rb");
+  if (!fptr) return NULL;
+
+  void *buffer = dka_fslurp_stream(arena, fptr, SIZE_MAX, len_out);
+
+  int saved_errno = errno;
+  fclose(fptr);
+  errno = saved_errno;
+  return buffer;
 } /* dka_fslurp() */
 
 DKA_DEF dk_arena *impl_dka__initialization(dka__params params) {
@@ -341,10 +429,16 @@ DKA_DEF dk_arena *impl_dka__initialization(dka__params params) {
 } /* impl_dka__initialization() */
 
 DKA_DEF void *impl_dka__allocation(dk_arena *arena, dka__params params, size_t size, bool zero_out) {
-  if (!arena) return NULL;
+  if (!arena) {
+    errno = EINVAL;
+    return NULL;
+  }
 
   if (!params.align) params.align = DKA_ALIGN;
-  if ((params.align & (params.align - 1)) != 0) return NULL;
+  if ((params.align & (params.align - 1)) != 0) {
+    errno = EINVAL;
+    return NULL;
+  }
 
   uintptr_t base = (uintptr_t)arena;
   size_t pos_align = (size_t)(DKA_ALIGN_UP_POW2(base + arena->pos, params.align) - base);
@@ -371,26 +465,37 @@ DKA_DEF void *impl_dka__allocation(dk_arena *arena, dka__params params, size_t s
   return out;
 
 error_oom:
+  errno = ENOMEM;
   arena->handle_oom(arena, size);
   return NULL;
 } /* impl_dka__allocation() */
 
 DKA_DEF void *impl_dka__callocation(dk_arena *arena, dka__params params, size_t count, size_t size) {
-  if (!arena) return NULL;
+  if (!arena) {
+    errno = EINVAL;
+    return NULL;
+  }
   if ((size) && (count > (arena->reserve - arena->pos) / size)) goto error_oom;
   return impl_dka__allocation(arena, params, count * size, true);
 
 error_oom:
+  errno = ENOMEM;
   arena->handle_oom(arena, count * size);
   return NULL;
 } /* impl_dka__callocation */
 
 DKA_DEF void *impl_dka__reallocation(dk_arena *arena, dka__params params, void *ptr, size_t old_size, size_t new_size) {
-  if (!arena) return NULL;
+  if (!arena) {
+    errno = EINVAL;
+    return NULL;
+  }
   if ((!ptr) || (!old_size)) return impl_dka__allocation(arena, params, new_size, false);
 
   if (!params.align) params.align = DKA_ALIGN;
-  if ((params.align & (params.align - 1)) != 0) return NULL;
+  if ((params.align & (params.align - 1)) != 0) {
+    errno = EINVAL;
+    return NULL;
+  }
 
   uintptr_t p = (uintptr_t)ptr, b = (uintptr_t)arena;
   if (p < b + DKA_BASE_POS) return NULL;
@@ -418,7 +523,10 @@ DKA_DEF void *impl_dka__reallocation(dk_arena *arena, dka__params params, void *
 } /* impl_dka__reallocation() */
 
 DKA_DEF void impl_dka__resetting(dk_arena *arena, bool do_decommit) {
-  if (!arena) return;
+  if (!arena) {
+    errno = EINVAL;
+    return;
+  }
 
   if (do_decommit) {
     if (arena->commit_pos > arena->page_size) {
@@ -645,7 +753,10 @@ static inline bool hlpr_dkda__overflow(size_t elem_size, size_t count, size_t *o
 } /* hlpr_dkda__overflow() */
 
 DKA_DEF void *impl_dkda__memdup(dk_arena *arena, const void *src, size_t elem_size) {
-  if ((!arena) || (!src) || (!elem_size)) return NULL;
+  if ((!arena) || (!src) || (!elem_size)) {
+    errno = EINVAL;
+    return NULL;
+  }
 
   size_t src_len = dkda_len(src);
   void *dest = impl_dkda__initialization(arena, elem_size, src_len);
@@ -657,7 +768,10 @@ DKA_DEF void *impl_dkda__memdup(dk_arena *arena, const void *src, size_t elem_si
 }
 
 DKA_DEF void *impl_dkda__initialization(dk_arena *arena, size_t elem_size, size_t count) {
-  if ((!arena) || (!elem_size)) return NULL;
+  if ((!arena) || (!elem_size)) {
+    errno = EINVAL;
+    return NULL;
+  }
 
   size_t bytes;
   if (hlpr_dkda__overflow(elem_size, count, &bytes)) goto error_oom;
@@ -671,12 +785,16 @@ DKA_DEF void *impl_dkda__initialization(dk_arena *arena, size_t elem_size, size_
   return header + 1;
 
 error_oom:
+  errno = ENOMEM;
   arena->handle_oom(arena, SIZE_MAX);
   return NULL;
 } /* impl_dkda__initialization() */
 
 DKA_DEF void *impl_dkda__growth(dk_arena *arena, void *arr, size_t elem_size) {
-  if ((!arena) || (!elem_size)) return NULL;
+  if ((!arena) || (!elem_size)) {
+    errno = EINVAL;
+    return NULL;
+  }
   if (!arr) return impl_dkda__initialization(arena, elem_size, DKDA_DEFAULT_CAPACITY);
 
   dkda_header *header = (dkda_header *)arr - 1;
@@ -686,12 +804,16 @@ DKA_DEF void *impl_dkda__growth(dk_arena *arena, void *arr, size_t elem_size) {
   return impl_dkda__reservation(arena, arr, elem_size, new_cap);
 
 error_oom:
+  errno = ENOMEM;
   arena->handle_oom(arena, SIZE_MAX);
   return NULL;
 } /* impl_dkda__growth() */
 
 DKA_DEF void *impl_dkda__reservation(dk_arena *arena, void *arr, size_t elem_size, size_t size) {
-  if ((!arena) || (!size) || (!elem_size)) return NULL;
+  if ((!arena) || (!size) || (!elem_size)) {
+    errno = EINVAL;
+    return NULL;
+  }
   if (!arr) return impl_dkda__initialization(arena, elem_size, size);
 
   dkda_header *header = (dkda_header *)arr - 1;
@@ -710,6 +832,7 @@ DKA_DEF void *impl_dkda__reservation(dk_arena *arena, void *arr, size_t elem_siz
   return header + 1;
 
 error_oom:
+  errno = ENOMEM;
   arena->handle_oom(arena, SIZE_MAX);
   return NULL;
 } /* impl_dkda__reservation() */
@@ -729,7 +852,7 @@ typedef struct {
 } dksb__params;
 
 #define dksb_build(arena, str)                dksb_build_wlen((arena), (str), strlen(str))
-#define dksb_build_lit(arena, str_lit)        dksb_build_wlen((arena), ("" str_lit), sizeof("" str_lit))
+#define dksb_build_lit(arena, str_lit)        dksb_build_wlen((arena), ("" str_lit), sizeof("" str_lit) - 1)
 #define dksb_strdup(arena, sb)                dksb_build_wlen((arena), (sb), dksb_strlen(sb))
 #define dksb_null_terminate(arena, sb)        impl_dksb__push_null((arena), &(sb))
 #define dksb_tolower(sb)                      impl_dksb__letter_case_shift(&(sb), true)
@@ -810,7 +933,10 @@ DKA_DEF int dksb_compare(dksb a, dksb b) {
 } /* dksb_compare() */
 
 DKA_DEF dksb dksb_build_wlen(dk_arena *arena, const char *str, size_t len) {
-  if ((!arena) || (!str)) return NULL;
+  if ((!arena) || (!str)) {
+    errno = EINVAL;
+    return NULL;
+  }
 
   size_t alloc_size;
   if (__builtin_add_overflow(len, (size_t)1, &alloc_size)) goto error_oom;
@@ -824,6 +950,7 @@ DKA_DEF dksb dksb_build_wlen(dk_arena *arena, const char *str, size_t len) {
   return sb;
 
 error_oom:
+  errno = ENOMEM;
   arena->handle_oom(arena, SIZE_MAX);
   return NULL;
 } /* dksb_build_wlen() */
@@ -840,7 +967,10 @@ static inline bool hlpr_dksb__pop_null(dksb *sb) {
 } /* hlpr_dksb__pop_null() */
 
 DKA_DEF bool impl_dksb__push_null(dk_arena *arena, dksb *sb) {
-  if ((!arena) || (!sb)) return false;
+  if ((!arena) || (!sb)) {
+    errno = EINVAL;
+    return false;
+  }
   if (!(*sb)) return false;
 
   size_t len = dkda_len(*sb);
@@ -851,7 +981,10 @@ DKA_DEF bool impl_dksb__push_null(dk_arena *arena, dksb *sb) {
 } /* impl_dksb__push_null() */
 
 DKA_DEF bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower) {
-  if (!sb) return false;
+  if (!sb) {
+    errno = EINVAL;
+    return false;
+  }
   if (dksb_isempty(*sb)) return false;
 
   size_t len = dksb_strlen(*sb);
@@ -864,8 +997,14 @@ DKA_DEF bool impl_dksb__letter_case_shift(dksb *sb, bool to_lower) {
 } /* impl_dksb__letter_case_shift() */
 
 DKA_DEF bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n) {
-  if ((!arena) || (!sb)) return false;
-  if (!(*sb)) return false;
+  if ((!arena) || (!sb)) {
+    errno = EINVAL;
+    return false;
+  }
+  if (!(*sb)) {
+    errno = EINVAL;
+    return false;
+  }
   hlpr_dksb__pop_null(sb);
 
   size_t len = dksb_strlen(*sb);
@@ -893,8 +1032,14 @@ DKA_DEF bool impl_dksb__insertion(dk_arena *arena, dksb *sb, char c, size_t n) {
 } /* impl_dksb__insertion() */
 
 DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, size_t b_len) {
-  if ((!arena) || (!a)) return false;
-  if (!(*a)) return false;
+  if ((!arena) || (!a)) {
+    errno = EINVAL;
+    return false;
+  }
+  if (!(*a)) {
+    errno = EINVAL;
+    return false;
+  }
   if (b_len == 0) return true;
 
   size_t a_len = dksb_strlen(*a);
@@ -924,16 +1069,23 @@ DKA_DEF bool impl_dksb__concatenation(dk_arena *arena, dksb *a, const char *b, s
   return impl_dksb__push_null(arena, a);
 
 error_oom:
+  errno = ENOMEM;
   arena->handle_oom(arena, SIZE_MAX);
   return false;
 } /* impl_dksb__concatenation() */
 
 DKA_DEF bool impl_dksb__removal(dksb *sb, size_t n, dksb__params params) {
-  if (!sb) return false;
+  if (!sb) {
+    errno = EINVAL;
+    return false;
+  }
   if (dksb_isempty(*sb)) return false;
 
   size_t len = dksb_strlen(*sb);
-  if (n >= len) return false;
+  if (n >= len) {
+    errno = EINVAL;
+    return false;
+  }
 
   if (len == 1) {
     (*sb)[0] = '\0';
@@ -955,7 +1107,10 @@ DKA_DEF bool impl_dksb__removal(dksb *sb, size_t n, dksb__params params) {
 } /* impl_dksb__removal() */
 
 DKA_DEF bool impl_dksb__reversal(dksb *sb) {
-  if (!sb) return false;
+  if (!sb) {
+    errno = EINVAL;
+    return false;
+  }
   if (dksb_isempty(*sb)) return false;
 
   size_t len = dksb_strlen(*sb);
